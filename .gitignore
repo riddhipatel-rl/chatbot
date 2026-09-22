@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+
+app/tests/*
+
+uploads/*
+data/chunks/*
+data/ocr/*
+data/rendered/*
+
+.streamlit/secrets.toml
