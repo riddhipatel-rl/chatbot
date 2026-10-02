@@ -26,7 +26,7 @@ class RetrievalService:
         self.chunks = []
         self.bm25 = None
 
-        self.refresh()
+        #self.refresh()
 
     def refresh(self):
         self.chunks = self.chunk_store.load_all()
