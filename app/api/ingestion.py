@@ -3,13 +3,13 @@ from typing import Annotated
 from pathlib import Path
 from uuid import uuid4
 import shutil
+import traceback
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.services.ingestion_service import IngestionService
 from app.services.retrieval_service import (
     RetrievalService,
 )
-from app.services.retrieval_service import retrieval_service
 
 router = APIRouter(
     prefix="/documents",
@@ -20,7 +20,7 @@ UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 ingestion_service = IngestionService()
-
+retrieval_service = RetrievalService()
 
 @router.post("/upload")
 async def upload_document(
@@ -79,14 +79,18 @@ async def upload_document(
             detail=str(exc),
         )
 
-    except Exception:
+    except Exception as exc:
+
+        print("\n========== DOCUMENT PROCESSING ERROR ==========")
+        traceback.print_exc()
+        print("===============================================\n")
 
         if file_path.exists():
             file_path.unlink()
 
         raise HTTPException(
             status_code=500,
-            detail="Document processing failed",
+            detail=str(exc),
         )
 
 

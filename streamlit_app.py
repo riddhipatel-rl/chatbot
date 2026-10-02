@@ -3,8 +3,14 @@ from pathlib import Path
 
 import streamlit as st
 
+
 ROOT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(ROOT_DIR))
+
+sys.path.insert(
+    0,
+    str(ROOT_DIR),
+)
+
 
 SAMPLE_ZIP_PATH = (
     ROOT_DIR
@@ -12,13 +18,23 @@ SAMPLE_ZIP_PATH = (
     / "multiple_files.zip"
 )
 
+
 from app.services.ingestion_service import IngestionService
-from app.services.retrieval_service import retrieval_service
+from app.services.answer_service import AnswerService
+from app.services.retrieval_service import RetrievalService
+
 from ui.header import render_header
 from ui.question_section import render_question_section
 from ui.results_section import render_results
 from ui.styles import apply_styles
 from ui.upload_section import render_upload_section
+
+
+st.set_page_config(
+    page_title="Document RAG",
+    page_icon="📄",
+    layout="wide",
+)
 
 
 if "search_results" not in st.session_state:
@@ -33,18 +49,37 @@ if "loaded_documents" not in st.session_state:
 if "sample_loaded" not in st.session_state:
     st.session_state.sample_loaded = False
 
-
-st.set_page_config(
-    page_title="Document RAG",
-    page_icon="📄",
-    layout="wide",
-)
+if "answer" not in st.session_state:
+    st.session_state.answer = None
 
 
-ingestion_service = IngestionService()
+@st.cache_resource
+def get_ingestion_service():
+    return IngestionService()
+
+
+@st.cache_resource
+def get_retrieval_service():
+    return RetrievalService()
+
+
+@st.cache_resource
+def get_answer_service():
+    return AnswerService()
+
+
+ingestion_service = get_ingestion_service()
+
+retrieval_service = get_retrieval_service()
+
+answer_service = get_answer_service()
+
+answer_service.retrieval_service = retrieval_service
 
 apply_styles()
+
 render_header()
+
 
 render_upload_section(
     ROOT_DIR,
@@ -53,6 +88,10 @@ render_upload_section(
     retrieval_service,
 )
 
-render_question_section(retrieval_service)
+
+render_question_section(
+    answer_service,
+)
+
 
 render_results()

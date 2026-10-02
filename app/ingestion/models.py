@@ -12,6 +12,32 @@ class SourceLocation:
     column_start: int | None = None
     column_end: int | None = None
 
+@dataclass
+class PageAnalysis:
+    page_number: int
+    text_length: int
+    text_blocks: int
+
+    image_count: int
+    image_area_ratio: float
+
+    drawing_count: int
+    drawing_area_ratio: float
+
+    has_text: bool
+    has_images: bool
+    has_vector_graphics: bool
+    is_visual_heavy: bool
+    
+@dataclass
+class VisualRegion:
+    region_id: str
+    page_number: int
+    bbox: dict[str, float]
+    region_type: str = "unknown"
+    source: str = "unknown"
+    area_ratio: float = 0.0
+    metadata: dict = field(default_factory=dict)
 
 @dataclass
 class DocumentElement:

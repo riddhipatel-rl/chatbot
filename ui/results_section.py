@@ -2,53 +2,129 @@ import streamlit as st
 
 
 def render_results():
-    if st.session_state.search_results is not None:
 
-        st.divider()
+    answer = st.session_state.get("answer")
 
-        if not st.session_state.search_results:
+    if answer is None:
+        return
 
-            st.info(
-                "No relevant information was found in the loaded documents."
-            )
+    st.divider()
 
-        else:
+    st.markdown(
+        """
+        <div class="relevant-header">
+            <div class="relevant-icon">💡</div>
+            <div>
+                <div class="relevant-title">Answer</div>
+                <div class="relevant-subtitle">
+                    Answer generated from the retrieved document evidence.
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    answer_text = answer.get("answer")
+
+    if answer_text:
+        st.markdown(answer_text)
+    else:
+        st.info("No answer was generated.")
+
+    sources = answer.get("sources", [])
+
+    if not sources:
+        return
+
+    st.markdown("### Sources")
+
+    for source in sources:
+
+        file_name = source.get(
+            "file",
+            "Unknown document",
+        )
+
+        pages = source.get(
+            "pages",
+            [],
+        )
+
+        with st.container(border=True):
 
             st.markdown(
-                """
-                <div class="relevant-header">
-                    <div class="relevant-icon">📄</div>
-                    <div>
-                        <div class="relevant-title">Relevant information</div>
-                        <div class="relevant-subtitle">
-                            Information retrieved from your documents.
-                        </div>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                f"📄 **{file_name}**"
             )
 
-            for result in st.session_state.search_results:
+            if pages:
+                page_text = ", ".join(
+                    str(page)
+                    for page in pages
+                )
 
-                with st.container(
-                    border=True
-                ):
+                st.caption(
+                    f"Page(s): {page_text}"
+                )
+
+            evidence = source.get(
+                "evidence",
+                [],
+            )
+
+            if not evidence:
+                continue
+
+            st.markdown("**Evidence**")
+
+            for item in evidence:
+
+                evidence_type = item.get(
+                    "type"
+                )
+
+                title = item.get(
+                    "title"
+                )
+
+                evidence_text = item.get(
+                    "evidence"
+                )
+
+                page = item.get(
+                    "page"
+                )
+
+                if evidence_type == "vision":
 
                     st.markdown(
-                        result["text"]
+                        "📊 **Vision evidence**"
                     )
 
-                    source_text = (
-                        f"📄 {result['source_file']}"
+                elif evidence_type == "visual_text":
+
+                    st.markdown(
+                        "📊 **Extracted visual content**"
                     )
 
-                    if result.get("page") is not None:
+                else:
 
-                        source_text += (
-                            f"  ·  Page {result['page']}"
-                        )
+                    continue
+
+                if title:
+
+                    st.markdown(
+                        f"**{title}**"
+                    )
+
+                if page is not None:
 
                     st.caption(
-                        source_text
+                        f"Page {page}"
+                    )
+
+                if evidence_text:
+
+                    st.write(
+                        evidence_text
                     )

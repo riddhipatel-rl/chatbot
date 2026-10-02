@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from torch import chunk
+
 from app.ingestion.chunker import DocumentChunker
 from app.ingestion.detector import is_supported
 from app.ingestion.docling_converter import (
@@ -18,7 +20,14 @@ from app.ingestion.extractor.xml_extractor import XMLExtractor
 from app.ingestion.extractor.pdf_extractor import PDFExtractor
 from app.ingestion.document_renderer import DocumentRenderer
 
+from app.ingestion.analyzer.page_analyzer import PDFPageAnalyzer
+from app.ingestion.analyzer.page_router import PageRouter
 
+from app.ingestion.extractor.visual_metadata_extractor import (
+    VisualMetadataExtractor,
+)
+
+from collections import Counter
 class IngestionService:
 
     def __init__(self):
@@ -39,6 +48,9 @@ class IngestionService:
         self.xml_extractor = XMLExtractor()
         self.pdf_extractor = PDFExtractor()
         self.document_renderer = DocumentRenderer()
+        self.page_analyzer = PDFPageAnalyzer()
+        self.page_router = PageRouter()
+        self.visual_metadata_extractor = VisualMetadataExtractor()
 
     def ingest(
         self,
@@ -89,31 +101,54 @@ class IngestionService:
                 )
 
         extension = file_path.suffix.lower()
+        render_path = None
 
         if extension == ".pdf":
+
+            render_path = file_path
+
+            analyses = self.page_analyzer.analyze(file_path)
+
+            visual_pages = {
+                analysis.page_number
+                for analysis in analyses
+                if analysis.is_visual_heavy
+            }
+
+            normal_pages = {
+                analysis.page_number
+                for analysis in analyses
+                if not analysis.is_visual_heavy
+            }
+
+            print("========== PDF PAGE ROUTING ==========")
+            print("Normal pages:", sorted(normal_pages))
+            print("Visual pages:", sorted(visual_pages))
+            print("======================================")
 
             canonical = self.pdf_extractor.extract(
                 file_path,
                 source_file=source_file,
                 file_type=".pdf",
+                page_numbers=normal_pages,
             )
 
-            if not canonical.elements:
+            visual_elements = self.visual_metadata_extractor.extract(
+                file_path,
+                page_numbers=visual_pages,
+            )
 
-                searchable_path = (
-                    Path("data/ocr") / file_path.name
-                )
+            canonical.elements.extend(visual_elements)
 
-                self.pdf_ocr.make_searchable(
-                    input_path=file_path,
-                    output_path=searchable_path,
+            canonical.elements.sort(
+                key=lambda element: (
+                    element.location.page or 0,
+                    element.order,
                 )
+            )
 
-                canonical = self.pdf_extractor.extract(
-                    searchable_path,
-                    source_file=source_file,
-                    file_type=".pdf",
-                )
+            for order, element in enumerate(canonical.elements):
+                element.order = order
 
         elif extension in {
             ".png",
@@ -124,6 +159,7 @@ class IngestionService:
             canonical = self.ocr_extractor.extract(
                 file_path
             )
+            
 
         elif extension == ".xml":
 
@@ -159,11 +195,30 @@ class IngestionService:
         chunks = self.chunker.chunk(
             canonical
         )
+
+        for chunk in chunks:
+            chunk.metadata["file_path"] = str(file_path)
+
+            if render_path:
+                chunk.metadata["render_path"] = str(render_path)
+
+            if extension == ".pdf":
+                chunk.metadata["render_path"] = str(file_path)
+
+            elif extension == ".docx":
+                chunk.metadata["render_path"] = str(rendered_pdf)
+
         print("DEBUG CANONICAL:", canonical.source_file)
         print(
             "DEBUG CHUNKS:",
             {chunk.source_file for chunk in chunks}
         )
+        print("========== CHUNK METADATA BEFORE SAVE ==========")
+
+        for chunk in chunks[:2]:
+            print(chunk.metadata)
+
+        print("===============================================")
 
         self.chunk_store.save(
             document_id=canonical.document_id,

@@ -17,7 +17,7 @@ class ZipExtractor:
 
         extracted_files = []
 
-        with ZipFile(zip_path, "r") as archive:
+        with ZipFile(zip_path, "r") as archive:  # gives the opened ZIP file an internal variable name "archive".
 
             for member in archive.infolist():
 

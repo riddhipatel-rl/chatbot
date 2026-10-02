@@ -1,33 +1,134 @@
 import streamlit as st
 
 
-def render_question_section(retrieval_service):
-    SAMPLE_QUERIES = [
-        {
-            "question": "What is Effective Threat Modelling?",
-            "document": "Effective_Threat_Modeling_using_TAM.docx",
-        },
-        {
-            "question": "How to overcome Nervousness?",
-            "document": "Presentation.pptx",
-        },
-        {
-            "question": "What is Middleware?",
-            "document": "Introduction to HTTP.txt",
-        },
-        {
-            "question": "What is DLBCL?",
-            "document": "scanned.pdf",
-        },
-        {
-            "question": "What happened during the terrible storm?",
-            "document": "the_lantern_keeper_of_bellwood.md",
-        },
-    ]
-    if (
-        st.session_state.sample_loaded
-        and SAMPLE_QUERIES
+TEXT_SAMPLE_QUERIES = [
+    {
+        "question": "What is Effective Threat Modelling?",
+        "document": "Effective_Threat_Modeling_using_TAM.docx",
+    },
+    {
+        "question": "What is Middleware?",
+        "document": "Introduction to HTTP.txt",
+    },
+    {
+        "question": "What happened during the terrible storm?",
+        "document": "the_lantern_keeper_of_bellwood.md",
+    },
+]
+
+
+VISION_SAMPLE_QUERIES = [
+    {
+        "question": (
+            "What does 9% represent in the "
+            "Patient population by KDIGO stratification table?"
+        ),
+        "document": "scanned.pdf",
+    },
+    {
+        "question": (
+            "What information is shown in the "
+            "malaria diagnostic testing capacity figure?"
+        ),
+        "document": "scanned.pdf",
+    },
+]
+
+
+
+def _run_question(
+    question: str,
+    answer_service,
+):
+
+    st.session_state.query = question
+
+    with st.spinner(
+        "Finding relevant information..."
     ):
+
+        answer = answer_service.answer(
+            query=question,
+            top_k=2,
+        )
+
+    st.session_state.answer = answer
+    st.session_state.search_results = None
+
+
+def _render_sample_questions(
+    title,
+    questions,
+    answer_service,
+    key_prefix,
+):
+
+    st.markdown(
+        f'<div class="section-title">{title}</div>',
+        unsafe_allow_html=True,
+    )
+
+    for index, item in enumerate(
+        questions
+    ):
+
+        question = item["question"]
+        document = item["document"]
+
+        question_col, source_col = st.columns(
+            [5.8, 2.2],
+            gap="small",
+        )
+
+        with question_col:
+
+            if st.button(
+                question,
+                key=f"{key_prefix}_{index}",
+                use_container_width=True,
+            ):
+
+                try:
+
+                    _run_question(
+                        question,
+                        answer_service,
+                    )
+
+                except Exception as error:
+
+                    st.session_state.answer = None
+
+                    st.error(
+                        f"Search failed: {error}"
+                    )
+
+        with source_col:
+
+            icon = (
+                "📄"
+                if key_prefix == "text"
+                else "📊"
+            )
+
+            st.markdown(
+                f"""
+                <div class="question-source">
+                    <span class="question-source-icon">
+                        {icon}
+                    </span>
+                    {document}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_question_section(
+    answer_service,
+):
+
+    if st.session_state.sample_loaded:
 
         st.markdown(
             '<div class="section-title">Suggested questions</div>',
@@ -35,47 +136,31 @@ def render_question_section(retrieval_service):
         )
 
         st.caption(
-            "Click a question to try it."
+            "Choose a question to test the document RAG pipeline."
         )
 
-        for index, item in enumerate(
-            SAMPLE_QUERIES
-        ):
+        _render_sample_questions(
+            "Text-based questions",
+            TEXT_SAMPLE_QUERIES,
+            answer_service,
+            "text",
+        )
 
-            question = item["question"]
-            document = item["document"]
-
-            question_col, source_col = st.columns(
-                [5.8, 2.2],
-                gap="small",
-            )
-
-            with question_col:
-
-                if st.button(
-                    question,
-                    key=f"sample_query_{index}",
-                    use_container_width=True,
-                ):
-
-                    st.session_state.query = question
-                    st.session_state.search_results = None
-
-            with source_col:
-
-                st.markdown(
-                    f'<div class="question-source"><span class="question-source-icon">📄</span>{document}</div>',
-                    unsafe_allow_html=True,
-                )
-
-
+        _render_sample_questions(
+            "Vision-based questions",
+            VISION_SAMPLE_QUERIES,
+            answer_service,
+            "vision",
+        )
 
     st.markdown(
         """
         <div class="ask-header">
             <div class="ask-icon">💬</div>
             <div>
-                <div class="ask-title">Ask your own question</div>
+                <div class="ask-title">
+                    Ask your own question
+                </div>
                 <div class="ask-subtitle">
                     Ask anything about your loaded documents.
                 </div>
@@ -84,7 +169,6 @@ def render_question_section(retrieval_service):
         """,
         unsafe_allow_html=True,
     )
-
 
     with st.form("search_form"):
 
@@ -99,18 +183,21 @@ def render_question_section(retrieval_service):
             query = st.text_input(
                 "Question",
                 value=st.session_state.query,
-                placeholder="Ask anything about your documents...",
+                placeholder=(
+                    "Ask anything about your documents..."
+                ),
                 label_visibility="collapsed",
             )
 
         with button_col:
 
-            search_submitted = st.form_submit_button(
-                "➤  Ask",
-                type="primary",
-                use_container_width=True,
+            search_submitted = (
+                st.form_submit_button(
+                    "➤  Ask",
+                    type="primary",
+                    use_container_width=True,
+                )
             )
-
 
     if search_submitted:
 
@@ -125,56 +212,23 @@ def render_question_section(retrieval_service):
         elif not st.session_state.loaded_documents:
 
             st.info(
-                "Load sample documents or upload your own documents first."
+                "Load sample documents or upload "
+                "your own documents first."
             )
 
         else:
 
             try:
 
-                with st.spinner(
-                    "Finding relevant information..."
-                ):
-
-                    results = retrieval_service.search(
-                        query=query,
-                        k=2,
-                    )
-
-                formatted_results = []
-
-                for rank, (chunk, score) in enumerate(
-                    results,
-                    start=1,
-                ):
-
-                    formatted_results.append(
-                        {
-                            "rank": rank,
-                            "score": score,
-                            "chunk_id": chunk.chunk_id,
-                            "document_id": chunk.document_id,
-                            "source_file": chunk.source_file,
-                            "text": chunk.text,
-                            "metadata": chunk.metadata,
-                            "page": (
-                                chunk.locations[0].page
-                                if chunk.locations
-                                else None
-                            ),
-                        }
-                    )
-
-                st.session_state.search_results = (
-                    formatted_results
+                _run_question(
+                    query,
+                    answer_service,
                 )
 
             except Exception as error:
 
-                st.session_state.search_results = None
+                st.session_state.answer = None
 
                 st.error(
                     f"Search failed: {error}"
                 )
-
-

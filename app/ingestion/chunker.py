@@ -31,19 +31,45 @@ class DocumentChunker:
         chunks = []
         current_elements = []
         current_tokens = 0
+        current_page = None
 
         for element in elements:
+
+            element_page = (
+                element.location.page
+                if element.location
+                else None
+            )
 
             element_tokens = self._estimate_tokens(
                 element.text
             )
+
+            if current_page is None:
+                current_page = element_page
+
+            if (
+                current_elements
+                and element_page != current_page
+            ):
+                chunks.append(
+                    self._create_chunk(
+                        current_elements,
+                        document.source_file
+                    )
+                )
+
+                current_elements = []
+                current_tokens = 0
+                current_page = element_page
 
             if self._is_heading(element):
 
                 if current_elements:
                     chunks.append(
                         self._create_chunk(
-                            current_elements
+                            current_elements,
+                            document.source_file,
                         )
                     )
 
@@ -57,12 +83,14 @@ class DocumentChunker:
             ):
                 chunks.append(
                     self._create_chunk(
-                        current_elements
+                        current_elements,
+                        document.source_file,
                     )
                 )
 
                 current_elements = self._get_overlap(
-                    current_elements
+                    current_elements,
+                    current_page,
                 )
 
                 current_tokens = sum(
@@ -78,7 +106,8 @@ class DocumentChunker:
         if current_elements:
             chunks.append(
                 self._create_chunk(
-                    current_elements
+                    current_elements,
+                    document.source_file,
                 )
             )
 
@@ -87,6 +116,7 @@ class DocumentChunker:
     def _create_chunk(
         self,
         elements: list[DocumentElement],
+        source_file: str,
     ) -> DocumentChunk:
 
         text = "\n".join(
@@ -98,11 +128,64 @@ class DocumentChunker:
             "document_id"
         )
 
+        visual_metadata = []
+
+        for element in elements:
+
+            if element.element_type.lower() != "visual":
+                continue
+
+            metadata = element.metadata
+
+            visual_metadata.append(
+                {
+                    "element_id": element.element_id,
+                    "page": (
+                        element.location.page
+                        if element.location
+                        else None
+                    ),
+                    "title": metadata.get(
+                        "visual_title"
+                    ),
+                    "text": element.text,
+                    "parser": metadata.get(
+                        "parser"
+                    ),
+                    "extractable": metadata.get(
+                        "extractable"
+                    ),
+                    "ocr_required": metadata.get(
+                        "ocr_required"
+                    ),
+                }
+            )
+
+        visual_page = any(
+            element.metadata.get(
+                "visual_page",
+                False,
+            )
+            for element in elements
+        )
+
+        chunk_metadata = {
+            "start_order": elements[0].order,
+            "end_order": elements[-1].order,
+            "element_count": len(elements),
+            "visual_page": visual_page,
+        }
+
+        if visual_metadata:
+            chunk_metadata[
+                "visual_elements"
+            ] = visual_metadata
+
         return DocumentChunk(
             chunk_id=str(uuid4()),
             document_id=document_id,
             text=text,
-            source_file=elements[0].source_file,
+            source_file=source_file,
             locations=[
                 element.location
                 for element in elements
@@ -111,16 +194,13 @@ class DocumentChunker:
                 element.element_type
                 for element in elements
             ],
-            metadata={
-                "start_order": elements[0].order,
-                "end_order": elements[-1].order,
-                "element_count": len(elements),
-            },
+            metadata=chunk_metadata,
         )
 
     def _get_overlap(
         self,
         elements: list[DocumentElement],
+        page: int | None,
     ) -> list[DocumentElement]:
 
         overlap = []
@@ -128,14 +208,20 @@ class DocumentChunker:
 
         for element in reversed(elements):
 
+            element_page = (
+                element.location.page
+                if element.location
+                else None
+            )
+
+            if element_page != page:
+                break
+
             element_tokens = self._estimate_tokens(
                 element.text
             )
 
-            if (
-                tokens + element_tokens
-                > self.overlap_tokens
-            ):
+            if tokens + element_tokens > self.overlap_tokens:
                 break
 
             overlap.insert(0, element)

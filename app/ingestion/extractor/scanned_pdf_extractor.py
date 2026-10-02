@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-import fitz
+import pymupdf
 
 from app.ingestion.models import (
     CanonicalDocument,
@@ -21,7 +21,7 @@ class ScannedPDFExtractor:
         file_path: Path,
     ) -> bool:
 
-        pdf = fitz.open(file_path)
+        pdf = pymupdf.open(file_path)
 
         try:
             for page in pdf:
@@ -42,7 +42,7 @@ class ScannedPDFExtractor:
         elements = []
         order = 0
 
-        pdf = fitz.open(file_path)
+        pdf = pymupdf.open(file_path)
 
         try:
             for page_number, page in enumerate(

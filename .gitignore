@@ -9,5 +9,6 @@ uploads/*
 data/chunks/*
 data/ocr/*
 data/rendered/*
-
+data/visual_pages/*
+data/vectorstore/*
 .streamlit/secrets.toml
