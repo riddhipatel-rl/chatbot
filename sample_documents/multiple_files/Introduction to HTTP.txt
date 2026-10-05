@@ -1,0 +1,797 @@
+1. Introduction to HTTP (0:15)
+HTTP (Hypertext Transfer Protocol) is the primary medium through which browsers communicate with servers to send or receive data (0:15-0:22).
+
+Two Core Ideas of HTTP:
+
+Statelessness (0:34-2:29):
+HTTP has no memory of past interactions (0:42). Each request carries all necessary information (headers, URLs, methods) for the server to process it (0:49-0:57).
+After the server responds, it forgets about the request (0:58). Subsequent requests are treated as new, unrelated events (1:00-1:05).
+This means self-contained requests; each request must include all necessary data like authentication tokens or session information (1:08-1:20). For example, accessing a user profile requires providing credentials on every request (1:22-1:31).
+Benefits of Statelessness:
+Simplicity: Simplifies server architecture as no session information needs to be stored, reducing complexity and resource usage (1:38-1:48).
+Scalability: Easy to distribute requests across multiple servers since no single server tracks a session (1:51-2:01).
+Resilience: If a server crashes, it doesn't affect client interaction state as there's no session to restore (2:01-2:09).
+State Management: Despite being stateless, developers often implement state management techniques like cookies, sessions, or tokens for continuity in interactions (e.g., user logins, shopping carts) (2:13-2:27).
+Client-Server Model (2:31-3:20):
+Client: Typically a web browser or application that initiates communication by sending a request to the server (2:39-2:44). Responsible for providing all necessary information like URL or headers (2:46-2:55).
+Server: Hosts resources (websites, APIs, content) and waits for incoming requests (2:59-3:04). Processes requests and sends back appropriate responses (web page, data, error message, JSON, text file) (3:07-3:19).
+Communication is always initiated by the client to get a response from the server (3:21-3:30).
+HTTP and TCP (3:59-4:45):
+
+To send requests/receive responses, clients and servers need a connection (4:01-4:07).
+HTTP uses TCP (Transmission Control Protocol) as its underlying transport protocol (4:13-4:17).
+HTTP requires the transport protocol to be reliable and not lose messages (4:22-4:31). TCP is considered more reliable than UDP (4:33-4:40).
+Backend engineers often deal with the Application Layer (Layer 7) of the OSI model (4:52-5:01).
+2. Evolution of HTTP (5:46)
+Different versions of HTTP have refined how clients and servers communicate (5:49-5:54):
+
+HTTP 1.0: Each request opened a new connection, leading to inefficiencies (5:56-6:07).
+HTTP 1.1: Introduced persistent connections, allowing multiple requests/responses over the same TCP connection, significantly improving performance (6:11-6:23). Also added chunk transfer encoding and better caching (6:23-6:29).
+HTTP 2.0: Introduced multiplexing (multiple requests/responses over a single connection) (6:31-6:34). Uses binary framing instead of text, supports header compression (HPACK), and server push (servers sending resources before client requests them) (6:36-6:45).
+HTTP 3.0: Built on QUIC protocol (a transport layer protocol over UDP instead of TCP) (6:47-6:56). Designed for faster connection establishment, reduced latency, and better packet loss handling (6:56-7:01). Continues multiplexing without head-of-line blocking (7:04-7:08).
+3. HTTP Messages (7:29)
+HTTP communication involves two types of messages:
+
+Request Message: Sent by the client (7:36-7:40).
+Components (7:45-8:46):
+Request Method (e.g., GET) (8:05)
+Resource URL (8:07)
+HTTP Version (e.g., HTTP 1.1) (8:11)
+Host (domain) (8:16)
+Headers (key-value pairs of parameters, discussed later) (8:26)
+Blank Line (separates headers from body) (8:32)
+Request Body (information client wants to send) (8:39)
+Response Message: Received by the client from the server (7:41-7:44).
+Components (8:48-9:07):
+HTTP Version (8:49)
+Status Code (e.g., 200) and its value (e.g., OK) (8:51-8:59)
+Response Headers (9:02)
+Blank Line (9:04)
+Response Body (9:06)
+4. HTTP Headers (9:09)
+Headers are key-value pairs of parameters sent with requests or received with responses (9:18-9:28).
+
+Why Headers are Needed (9:30-10:58):
+
+They provide metadata about the request or response, similar to how an address is written on top of a parcel (9:44-9:58).
+This allows intermediaries (like routers or proxies) to process information quickly without needing to inspect the body of the message (10:19-10:29).
+Types of HTTP Headers (11:11-16:07):
+
+Request Headers (11:24-12:04): Sent by the client to provide information about the request, client environment, preferences, and capabilities.
+User-Agent: Identifies the client (browser, Postman, mobile app) (11:30).
+Authorization: Sends credentials (e.g., bearer token) to identify the user (11:42).
+Accept: Specifies content types the client expects (JSON, text, HTML) (11:49).
+General Headers (12:07-12:32): Used in both requests and responses, providing metadata about the message itself.
+Date: Timestamp of the message (12:15).
+Cache-Control: Caching mechanisms (e.g., no-cache, max-age) (12:18).
+Connection: Information on whether to keep the connection alive or close it (12:22).
+Representation Headers (12:34-13:15): Deal with the representation of the resource being transmitted (request or response body).
+Content-Type: Describes the media type (e.g., JSON, HTML) (12:43).
+Content-Length: Size of the resource in bytes (12:51).
+Content-Encoding: Specifies encoding (e.g., GZIP, deflate) (12:54).
+ETag: Unique identifier primarily used for caching (12:59).
+Security Headers (13:16-14:12): Enhance request/response security by controlling content loading, cookies, and encryption.
+Strict-Transport-Security (HSTS): Ensures HTTPS communication only (13:23).
+Content-Security-Policy (CSP): Restricts content sources to prevent XSS attacks (13:31).
+X-Frame-Options: Prevents embedding in iframes to mitigate clickjacking (13:40).
+X-Content-Type-Options: Prevents MIME type sniffing (13:45).
+Set-Cookie with HttpOnly or Secure flags: Secures cookies by making them inaccessible via JavaScript and ensuring HTTPS transmission (13:53).
+Key Ideas related to Headers:
+
+
+### *1. The Backend Architecture Pattern*
+When a client sends an HTTP request to a server, separating the server's code into different components (Controllers, Services, and Repositories) is not strictly mandatory, but it is a vital design pattern. This separation of concerns makes the codebase scalable, maintainable, easier to debug, and easier to add new features.
+
+### *2. The Controller (Handler) Layer*
+The Controller (or Handler) is the entry point for an API route after the routing algorithm matches the URL. Its primary responsibility is managing the flow of data from the client to the server, and back to the client.
+
+*Step-by-Step Workflow of a Controller:*
+1.  *Data Extraction:* The controller receives the HTTP `request` and `response` objects from the underlying programming runtime. It takes the necessary data out of the request (e.g., query parameters for a GET request, or the JSON body for a POST request).
+2.  *Binding (Deserialization):* Because the request travels over the internet as a JSON string, the controller must deserialize it into the programming language's native data format (like a Go struct, a Python dictionary, or a JavaScript object). If this fails, the controller immediately halts and returns a `400 Bad Request`.
+3.  *Validation:* It checks if the incoming data matches the expected format, ensures mandatory fields are present, and prevents malicious payloads.
+4.  *Transformation:* It modifies the data for backend convenience before passing it downstream. For example, if a client doesn't provide an optional "sort" query parameter, the transformation pipeline can inject a default value (like sorting by date).
+5.  *Delegation:* It passes this clean, validated data to the Service Layer.
+6.  *Sending the Response:* Once the Service layer finishes processing, the Controller decides on the appropriate HTTP status code (e.g., `200 Success`, `201 Created`, or error codes like `400`/`500`) and sends the final response back to the client.
+
+### *3. The Service Layer*
+The Service Layer is where the actual business logic and core processing of the API happens.
+*   *Complete HTTP Isolation:* The Service layer should know *absolutely nothing* about HTTP. It should not deal with request/response objects, status codes, or validations. It simply acts as a standard function: it takes data in, processes it, and returns a result.
+*   *Orchestration:* A single service method can do many things. It can orchestrate multiple repository calls, merge different data sets, send emails, or make external API calls.
+
+### *4. The Repository (Database) Layer*
+The Repository layer's sole responsibility is dealing with database operations.
+*   *Workflow:* It takes data from the Service layer, constructs the specific database query (for inserting, filtering, or sorting), and returns the raw database results back to the Service layer.
+*   *Single Responsibility Principle:* A repository method should only do one specific thing and return one type of data. You should not use complex conditional logic inside a repository to make it return either a single book or an array of all books. Instead, you create two distinct repository methods.
+
+### *5. Middlewares*
+Middlewares are functions that execute in the middle of the request lifecycle—between the moment the server receives the request and the moment it hits the final Controller. 
+
+*   *Why use Middlewares?* To avoid duplicating code. Backend apps have common operations (security, logging, parsing) that need to run on hundreds of different API endpoints. Middlewares centralize this logic.
+*   *The `next()` Function:* Middlewares receive the standard `request` and `response` objects, but also a `next` function. Calling `next()` passes the execution to the subsequent middleware or handler in the chain. A middleware can optionally choose to not call `next()` and instead instantly return a response to the client, terminating the request early.
+*   *Execution Order Matters:* The order in which middlewares are arranged is critical because the request flows through them sequentially.
+
+*Common Examples of Middlewares:*
+*   *CORS & Security Headers:* Placed very early in the cycle to check the origin of the request. If the domain is unauthorized, it blocks the request instantly.
+*   *Rate Limiting:* Checks the user's IP address. If they are spamming the server, it instantly returns a `429 Too Many Requests` error to protect server resources.
+*   *Authentication:* Verifies the user's token. If invalid, it returns a `401 Unauthorized` error. If valid, it extracts the user's data and passes it downstream.
+*   *Logging:* Records details about the request (URL path, method, parameters) to the terminal for debugging.
+*   *Global Error Handling:* Usually placed at the *very end* of the middleware chain. It catches any unstructured errors thrown by the controllers or services and formats them into clean, standardized error messages for the client.
+
+### *6. Request Context*
+Request Context is a shared storage mechanism (usually a key-value store) that is strictly limited (scoped) to a single HTTP request.
+*   *Purpose:* Because the request passes through many different isolated function boundaries (multiple middlewares and the controller), Context allows them to share state and data without tightly coupling the system code.
+
+*Common Use Cases for Request Context:*
+1.  *Passing Authentication Data:* When the Authentication middleware validates a token, it extracts the `user_id` and the user's `role` (e.g., admin vs. standard user). It saves this inside the Request Context. Later, when the Controller is ready to save a new record, it pulls the `user_id` directly from the Context. This is crucial for security: you should never trust a `user_id` sent by the client in the JSON payload, as malicious users could spoof it.
+2.  *Request Tracing:* An early middleware can generate a unique ID (UUID) and save it to the Context. As the request travels through different microservices and logs, that specific ID is attached everywhere, allowing engineers to trace the exact path of a bug.
+3.  *Cancellations:* It can be used to store abort signals and timeout deadlines to prevent external service calls from hanging perpetually.
+
+
+===================================================================================================================================================================================
+(Highlighting text inside the pdf)
+
+
+def highlight_text(input_path: str, output_path: str, search_text: str):
+        doc = fitz.open(input_path)
+        words_to_find = search_text.lower().split()
+
+        for page in doc:
+            quads_to_highlight = []
+
+            for word in words_to_find:
+                quads = page.search_for(word, quads=True)
+
+                for q in quads:
+                    quads_to_highlight.append(q)
+
+            if quads_to_highlight:
+                annot = page.add_highlight_annot(quads_to_highlight)
+                annot.update()
+
+        doc.save(output_path)
+
+        doc.close()
+
+
+        ===========================================================================================================================================================
+        corrected
+
+        
+def highlight_text(input_path: str, output_path: str, search_text: str) -> str:
+        doc = fitz.open(input_path)
+        search_text_lower = search_text.lower()
+
+        for page in doc:                                 # Search text on page
+            text_instances = page.search_for(
+                search_text,
+                flags=fitz.TEXT_DEHYPHENATE              # handles line-break words
+            )
+
+            for inst in text_instances:
+                highlight = page.add_highlight_annot(inst)
+                highlight.update()
+                continue
+
+#if the text is not searchable or extracted then use OCR to find text: for that step 1 is to get pixels (i.e. image) of page and then use OCR to find text and its coordinates and then add highlight annotation based on those coordinates. Below is the code snippet for that:
+
+            pix = page.get_pixmap(dpi=300)  # get high-res image of page
+            img = Image.open(io.BytesIO(pix.tobytes()))  # convert to PIL image
+
+            ocr_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT) #get OCR data with bounding boxes
+            for i, word in enumerate(ocr_data["text"]):
+                if search_text_lower in word.lower():
+                    x = ocr_data["left"][i]
+                    y = ocr_data["top"][i]
+                    w = ocr_data["width"][i]
+                    h = ocr_data["height"][i]
+
+                    # Convert OCR coords to PDF coords so that pymupdf can understand them
+                    rect = fitz.Rect(x, y, x + w, y + h)
+                    page.add_highlight_annot(rect)
+
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)   # confirm temp directory is there
+
+        doc.save(output_path, garbage=4, deflate=True)
+        doc.close()
+
+        return output_path
+        
+        
+        
+  ======== #the correct one =========================================================================================================================================
+        ( for diagonal box text highlight using OCR )
+        
+        
+            def highlight_text(input_path: str, output_path: str, search_text: str) -> str:
+        doc = fitz.open(input_path)
+        search_lower = search_text.lower()
+
+        for page in doc:                                              #STEP 1: Try normal PDF text search
+            text_instances = page.search_for(
+                search_text,
+                flags=fitz.TEXT_DEHYPHENATE,
+                quads=True,  # for rotated/diagonal text (cant use rect)
+            )
+
+            if text_instances:
+                for inst in text_instances:
+                    page.add_highlight_annot(inst)
+                continue  # Skip OCR for this page
+
+            pix = page.get_pixmap(dpi=300)                          #STEP 2: OCR fallback(if the search_for fails)
+            img = Image.open(io.BytesIO(pix.tobytes()))             # convert to PIL image
+
+            ocr = pytesseract.image_to_data(
+                img, output_type=pytesseract.Output.DICT
+            )
+
+            # Scale factor: image coords(understands by pytesseract) converts to PDF coords(understood by pymupdf)
+            scale_x = page.rect.width / pix.width
+            scale_y = page.rect.height / pix.height
+
+            words = ocr["text"]
+            n = len(words)
+
+        #   OCR-based phrase detection + bounding box creation + PDF annotation.
+
+            # Build phrase window across words
+            for i in range(n):
+                phrase = ""
+                boxes = []
+
+                for j in range(i, min(i + 50, n)):  # window for phrase
+                    word = words[j].strip()
+                    if not word:
+                        continue
+
+                    phrase += word + " "
+                    boxes.append(j)
+
+                    if search_lower in phrase.lower():
+                        # Combine all boxes into one big rectangle
+                        x0 = min(ocr["left"][k] for k in boxes)
+                        y0 = min(ocr["top"][k] for k in boxes)
+                        x1 = max(ocr["left"][k] + ocr["width"][k] for k in boxes)
+                        y1 = max(ocr["top"][k] + ocr["height"][k] for k in boxes)
+
+                        # For OCR case, rectangle works more reliably
+                        # Convert OCR box to PDF space
+                        rect = fitz.Rect(
+                            x0 * scale_x,
+                            y0 * scale_y,
+                            x1 * scale_x,
+                            y1 * scale_y,
+                        )
+
+                        page.draw_rect(
+                            rect,
+                            color=None,            # no border
+                            fill=(1, 1, 0),        # yellow background
+                            overlay=True,          # draw above page content
+                        )
+
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        doc.save(output_path, garbage=4, deflate=True)
+        doc.close()
+        
+        
+        ============================================================================================================================================================
+        ( for a rectangular box highlight using quad (not a text highlight) )
+        
+            def highlight_text(input_path: str, output_path: str, search_text: str):
+
+        doc = fitz.open(input_path)
+
+        for page in doc:
+            quads = page.search_for(
+                search_text,
+                flags=fitz.TEXT_DEHYPHENATE,
+                quads=True,
+            )
+
+            if not quads:
+                continue
+
+        # finding the top-most, left-most, right-most and bottom-most points to create a rectangle around the search text
+            x = []
+            y = []
+
+            for q in quads:  #loop is running over all the quads filling bucket of x and y for every word
+                for point in q:
+                    x.append(point.x)
+                    y.append(point.y)
+
+            rect = fitz.Rect(min(x), min(y), max(x), max(y))  #rect is created using quads
+
+            annot = page.add_rect_annot(rect)
+            annot.set_colors(stroke=(1, 1, 0), fill=(1, 1, 0))
+            annot.set_opacity(0.25)
+            annot.update()
+        
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        doc.save(output_path, garbage=4, deflate=True)
+        doc.close()
+
+        return output_path
+        
+        
+   =======================================================================================================================================================================
+   (Attachment routes box highlight)
+        
+        @router.get("/highlight/{attachment_id}")
+async def highlight_attachment(
+    attachment_id: int,
+    text: str = Query(..., description="Text to highlight in PDF"),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = AttachmentRepository(db)
+    attachment = await repo.get_by_id(attachment_id)
+
+    if not attachment:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    original_path = attachment.file_path
+
+    if not original_path.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files supported")
+
+    # Temp highlighted file path
+    output_path = f"temp/highlighted_{attachment_id}.pdf"
+
+    try:
+        AttachmentService.highlight_text(
+            input_path=original_path,
+            output_path=output_path,
+            search_text=text,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return FileResponse(
+        path=output_path,
+        filename=f"highlighted_{attachment.file_name}",
+        media_type="application/pdf",
+    )
+    
+    
+    =======================================================================================================================================================================
+    
+    import fitz
+import os
+
+
+def highlight_text(input_path: str, output_path: str, search_text: str):
+
+    doc = fitz.open(input_path)
+
+    for page_num, page in enumerate(doc):
+
+        print(f"\n========== PAGE {page_num + 1} ==========")
+
+   
+        # ==========DEBUG PDF BLOCK STRUCTURE
+ 
+        blocks = page.get_text("blocks")
+
+        for i, b in enumerate(blocks):
+
+            print(f"\nBLOCK {i}")
+            print("------------")
+
+            # repr() shows real \n and spaces
+            print(repr(b[4]))
+
+        # ============NORMAL TEXT SEARCH
+       
+        quads = page.search_for(
+            search_text,
+            flags=fitz.TEXT_DEHYPHENATE,
+            quads=True,
+        )
+
+        print("\nSEARCH TEXT:")
+        print(repr(search_text))
+
+        print("MATCHES FOUND:", len(quads))
+
+        #===== IF EXACT SEARCH FOUND
+      
+        if quads:
+
+            print("Using exact text highlight")
+
+            x = []
+            y = []
+
+            for q in quads:
+
+                for point in q:
+
+                    x.append(point.x)
+                    y.append(point.y)
+
+            rect = fitz.Rect(
+                min(x),
+                min(y),
+                max(x),
+                max(y)
+            )
+
+            annot = page.add_rect_annot(rect)
+
+            annot.set_colors(
+                stroke=(1, 1, 0),
+                fill=(1, 1, 0)
+            )
+
+            annot.set_opacity(0.25)
+
+            annot.update()
+
+      #====== ANCHOR-BASED MATCHING
+        else:
+
+            print("Exact match failed")
+            print("Trying anchor-based matching")
+
+            # Take first line / first meaningful word
+            anchor = search_text.split("\n")[0].split(" ")[0]
+
+            print("ANCHOR:", anchor)
+
+            anchor_rects = page.search_for(anchor)
+
+            print("ANCHOR MATCHES:", len(anchor_rects))
+
+            if not anchor_rects:
+                continue
+
+            anchor_rect = anchor_rects[0]
+
+            nearby_rects = []
+
+        
+            # FIND NEARBY BLOCKS
+   
+            for block in blocks:
+
+                x0, y0, x1, y1, text, *_ = block
+
+                block_rect = fitz.Rect(x0, y0, x1, y1)
+
+                # nearby region logic
+                if (
+                    abs(y0 - anchor_rect.y0) < 200
+                    and abs(x0 - anchor_rect.x0) < 250
+                ):
+
+                    print("\nINCLUDING BLOCK:")
+                    print(repr(text))
+
+                    nearby_rects.append(block_rect)
+
+            if not nearby_rects:
+                continue
+
+
+            # MERGE RECTANGLES
+        
+            final_rect = nearby_rects[0]
+
+            for r in nearby_rects[1:]:
+
+                final_rect |= r
+
+            print("\nFINAL REGION:")
+            print(final_rect)
+
+            # ---------------------------------------------------
+            # DRAW REGION HIGHLIGHT
+            # ---------------------------------------------------
+            annot = page.add_rect_annot(final_rect)
+
+            annot.set_colors(
+                stroke=(1, 1, 0),
+                fill=(1, 1, 0)
+            )
+
+            annot.set_opacity(0.20)
+
+            annot.update()
+
+    # ---------------------------------------------------
+    # SAVE PDF
+    # ---------------------------------------------------
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    doc.save(
+        output_path,
+        garbage=4,
+        deflate=True
+    )
+
+    doc.close()
+
+    print("\nPDF SAVED:", output_path)
+
+    return output_path
+    
+    =======================================================================================================================================================================
+    ################################## THE ABOVE CODE IS...............
+    (Implemented a bounding-box highlight overlay by extracting text quad coordinates and converting them into a rectangular annotation. 
+    Also, instead of searching exact paragraph text using pymupdf's "search_for()" I tried finding semantic visual region around anchor text using paddleOCR + layout detection for those query texts which belong to different blocks/spans inside pdf structure.)
+    
+    (Implemented bounding-box highlight overlays using quad coordinates and rectangular annotations. Also tried Pytesseract + layout detection to identify semantic visual regions around anchor text for those query texts which belong to different blocks/spans where exact "search_for()" matching was not effective.)
+    
+    Anchor + Dynamic Nearby Text Region 
+     #######Spatial Layout Grouping
+     
+    - collect ALL nearby text blocks around the anchor.
+	STEP 1 — Get Blocks
+	blocks = page.get_text("blocks")
+	STEP 2 — Find Anchor
+	anchor_rects = page.search_for("Oncogenesis")
+	
+anchor = anchor_rects[0]
+nearby = []
+for block in blocks:
+    x0, y0, x1, y1, text, *_ = block
+
+    # Nearby region logic
+    if (
+        abs(y0 - anchor.y0) < 200 and
+        abs(x0 - anchor.x0) < 250
+    ):
+        nearby.append(fitz.Rect(x0, y0, x1, y1))
+
+how this founds nearby blocks to anchor
+STEP 4 — Merge Rectangles
+final_rect = nearby[0]
+
+for r in nearby[1:]:
+    final_rect |= r
+    
+STEP 5 — Highlight
+annot = page.add_rect_annot(final_rect)
+annot.set_colors(stroke=(1,1,0), fill=(1,1,0))
+annot.set_opacity(0.2)
+annot.update()
+    
+   
+
+	Very common in:
+
+	document AI
+	PDF parsers
+	OCR engines
+	invoice extraction systems
+	
+INSTEAD OF “Search exact paragraph text”
+
+TRIED:
+
+“Find semantic visual region around anchor”
+
+
+
+1. TEMPLATE-BASED (MOST ACCURATE)
+
+Best if PDFs follow similar layout.
+
+You:
+
+detect anchor
+use predefined region offsets
+
+Example:
+
+Oncogenesis -> fixed rectangle
+
+Pros:
+
+very accurate
+production stable
+
+Cons:
+
+PDF-specific
+
+
+
+
+=======================================================================================================================================================================
+
+
+    def highlight_text(input_path: str,output_path: str,search_text: str,):
+
+        doc = fitz.open(input_path)
+        total_annotations = 0
+
+        for page_num, page in enumerate(doc):
+
+            print(f"\n========== PAGE {page_num + 1} ==========")
+    
+            quads = page.search_for(                    #NORMAL PDF SEARCH
+                search_text,
+                flags=fitz.TEXT_DEHYPHENATE,
+                quads=True,
+            )
+            if quads:
+
+                print("NORMAL PDF SEARCH SUCCESS")
+
+                x = []
+                y = []
+
+                for q in quads:
+                    for point in q:
+                        x.append(point.x)
+                        y.append(point.y)
+
+                rect = fitz.Rect(min(x),min(y),max(x),max(y))
+
+                annot = page.add_rect_annot(rect)
+
+                annot.set_colors(stroke=(1, 1, 0),fill=(1, 1, 0))
+                annot.set_opacity(0.25)
+                annot.update()
+                total_annotations += 1
+                continue
+
+            # OCR + LOCAL SPATIAL GROUPING
+            print("NORMAL SEARCH FAILED")
+            print("TRYING OCR + SPATIAL GROUPING")
+
+            scale = 4
+            matrix = fitz.Matrix(scale, scale)
+            pix = page.get_pixmap(matrix=matrix)
+            temp_image_path = f"temp_page_{page_num}.png"
+            pix.save(temp_image_path)
+            image = Image.open(temp_image_path)
+
+            data = pytesseract.image_to_data(
+                image,
+                output_type=pytesseract.Output.DICT
+            )
+
+            ocr_words = [
+                clean_word(w)
+                for w in data["text"]
+            ]
+            search_words = [
+                clean_word(w)
+                for w in search_text.split()
+            ]
+
+            print("\nSEARCH WORDS:")
+            print(search_words)
+
+            if not search_words:
+                os.remove(temp_image_path)
+                continue
+
+            anchor_word = search_words[:2]              # USE FIRST WORD AS ANCHOR
+
+            print("\nANCHOR WORD:")
+            print(anchor_word)
+
+            anchor_indexes = []
+            
+            for i in range(len(data["text"])):
+                w1 = clean_word(data["text"][i])
+                if w1 != "tumour":
+                    continue
+
+                x1 = data["left"][i]
+                y1 = data["top"][i]
+
+                for j in range(len(data["text"])):
+                    w2 = clean_word(data["text"][j])
+                    if w2 != "immunity":
+                        continue
+
+                    x2 = data["left"][j]
+                    y2 = data["top"][j]
+
+                    if (abs(y1 - y2) < 80 and abs(x1 - x2) < 300):
+                        anchor_indexes.append(i)
+
+            print("\nOCR WORDS WITH COORDS:\n")
+
+            if not anchor_indexes:
+                print("NO ANCHOR INDEXES FOUND")
+                os.remove(temp_image_path)
+                continue
+
+            anchor_idx = anchor_indexes[0]
+            
+            anchor_x = data["left"][anchor_idx]
+            anchor_y = data["top"][anchor_idx]
+
+            print("\nANCHOR COORDS:")
+            print(anchor_x, anchor_y)
+            local_rects = []
+
+            for i in range(len(data["text"])):
+                word = clean_word(data["text"][i])
+                if not word:
+                    continue
+
+                x = data["left"][i]
+                y = data["top"][i]
+                w = data["width"][i]
+                h = data["height"][i]
+
+                # LOCAL REGION AROUND ANCHOR
+                if (
+                    x >= anchor_x - 50
+                    and x <= anchor_x + 500
+                    and y >= anchor_y - 40
+                    and y <= anchor_y + 300
+                ):
+
+                    rect = fitz.Rect(x,y,x + w,y + h)
+                    local_rects.append(rect)
+
+            print("\nLOCAL RECT COUNT:")
+            print(len(local_rects))
+
+            if not local_rects:
+                os.remove(temp_image_path)
+                continue
+
+            if not local_rects:
+                print("NO LOCAL RECTS FOUND")
+                os.remove(temp_image_path)
+                continue
+
+            final_rect = local_rects[0]
+
+            for r in local_rects[1:]:
+                final_rect |= r
+
+            print("\nFINAL REGION BEFORE PADDING:")
+            print(final_rect)
+  
+            final_rect.x0 -= 20         # SMALL PADDING
+            final_rect.y0 -= 20
+
+            final_rect.x1 += 20
+            final_rect.y1 += 20
+
+            print("\nFINAL REGION AFTER PADDING:")
+            print(final_rect)
+   
+            pdf_rect = fitz.Rect(           # IMAGE COORDS -> PDF COORDS
+                final_rect.x0 / scale,
+                final_rect.y0 / scale,
+                final_rect.x1 / scale,
+                final_rect.y1 / scale,
+            )
+
+            print("\nFINAL PDF RECT:")
+            print(pdf_rect)
+            annot = page.add_rect_annot(pdf_rect)
+
+            annot.set_colors(
+                stroke=(1, 1, 0),
+                fill=(1, 1, 0)
+            )
+
+            annot.set_opacity(0.25)
+            annot.update()
+            total_annotations += 1
+            os.remove(temp_image_path)
+
+        os.makedirs(os.path.dirname(output_path),exist_ok=True)
+
+        doc.save(output_path,garbage=4,deflate=True)
+        doc.close()
+        print("\n===================================")
+        print("TOTAL ANNOTATIONS:", total_annotations)
+        print("OUTPUT:", output_path)
+        print("===================================")
+        return output_path

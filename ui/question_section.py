@@ -4,7 +4,7 @@ import streamlit as st
 TEXT_SAMPLE_QUERIES = [
     {
         "question": "What is Effective Threat Modelling?",
-        "document": "Effective_Threat_Modeling_using_TAM.docx",
+        "document": "ETM.docx",
     },
     {
         "question": "What is Middleware?",
@@ -12,25 +12,34 @@ TEXT_SAMPLE_QUERIES = [
     },
     {
         "question": "What happened during the terrible storm?",
-        "document": "the_lantern_keeper_of_bellwood.md",
+        "document": "the_lantern_story.md",
     },
+    {
+        "question": "What types of blood diseases does Roche develop medicines for?",
+        "document": "scanned.pdf",
+    }
 ]
 
 
 VISION_SAMPLE_QUERIES = [
     {
         "question": (
-            "What does 9% represent in the "
-            "Patient population by KDIGO stratification table?"
+            "Look at Figure 15. What type of visualization is used to display malaria service readiness results?"
         ),
-        "document": "scanned.pdf",
+        "document": "hhfa.pdf",
     },
     {
         "question": (
-            "What information is shown in the "
-            "malaria diagnostic testing capacity figure?"
+            "What does the A2 albuminuria category represent?"
         ),
-        "document": "scanned.pdf",
+        "document": "visual.pdf",
+            
+    },
+    {
+        "question": (
+            "How many facilities were included in the national analysis shown in the table?"
+        ),
+        "document": "hhfa.pdf",
     },
 ]
 
@@ -40,13 +49,11 @@ def _run_question(
     question: str,
     answer_service,
 ):
-
     st.session_state.query = question
 
     with st.spinner(
         "Finding relevant information..."
     ):
-
         answer = answer_service.answer(
             query=question,
             top_k=2,
@@ -180,9 +187,9 @@ def render_question_section(
 
         with query_col:
 
-            query = st.text_input(
+            st.text_input(
                 "Question",
-                value=st.session_state.query,
+                key="query_input",
                 placeholder=(
                     "Ask anything about your documents..."
                 ),
@@ -201,6 +208,7 @@ def render_question_section(
 
     if search_submitted:
 
+        query = st.session_state.query_input
         st.session_state.query = query
 
         if not query.strip():

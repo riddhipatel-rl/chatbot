@@ -17,56 +17,17 @@ def apply_styles():
             margin-bottom: 2rem;
         }
 
+        .sidebar-title {
+            font-size: 1.35rem;
+            font-weight: 650;
+            margin-bottom: 0.35rem;
+        }
+
         .section-title {
             font-size: 1.35rem;
             font-weight: 600;
             margin-top: 1rem;
             margin-bottom: 0.35rem;
-        }
-
-        .demo-card {
-            background: #171a21;
-            border: 1px solid #2d313b;
-            border-radius: 0.9rem;
-            padding: 1rem 1.1rem 0.9rem;
-            min-height: 112px;
-        }
-
-        .demo-card-title {
-            font-size: 0.92rem;
-            font-weight: 600;
-            margin-bottom: 0.2rem;
-        }
-
-        .demo-card-text {
-            color: #8b93a5;
-            font-size: 0.78rem;
-            line-height: 1.35;
-            margin-bottom: 0.7rem;
-        }
-
-        .upload-help {
-            color: #8b93a5;
-            font-size: 0.76rem;
-            margin-top: -0.35rem;
-        }
-
-        [data-testid="stFileUploaderDropzone"] {
-            background: #171a21;
-            border: 1px dashed #4b5261;
-            border-radius: 0.9rem;
-            padding: 0.65rem 0.8rem;
-            min-height: 112px;
-            transition: border-color 0.2s ease, background 0.2s ease;
-        }
-
-        [data-testid="stFileUploaderDropzone"]:hover {
-            border-color: #7c8598;
-            background: #1b1f27;
-        }
-
-        [data-testid="stFileUploaderDropzone"] button {
-            border-radius: 0.55rem !important;
         }
 
         .question-source {
@@ -134,7 +95,12 @@ def apply_styles():
         }
 
         div[data-testid="stForm"] {
-            background: linear-gradient(135deg, #11161f 0%, #151b26 100%);
+            background: linear-gradient(
+                135deg,
+                #11161f 0%,
+                #151b26 100%
+            );
+
             border: 1px solid #283142;
             border-radius: 1rem;
             padding: 1.25rem;
@@ -163,10 +129,17 @@ def apply_styles():
         div[data-testid="stForm"] button[kind="primaryFormSubmit"] {
             height: 3.15rem;
             border-radius: 0.7rem;
-            background: linear-gradient(135deg, #4f6df5, #6366f1);
+            background: linear-gradient(
+                135deg,
+                #4f6df5,
+                #6366f1
+            );
+
             border: 1px solid #6478f6;
             font-weight: 600;
-            transition: transform 0.15s ease, filter 0.15s ease;
+            transition:
+                transform 0.15s ease,
+                filter 0.15s ease;
         }
 
         div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover {
@@ -203,8 +176,14 @@ def apply_styles():
             font-size: 0.88rem;
             margin-top: 0.2rem;
         }
+
         button[kind="primary"] {
-            background: linear-gradient(135deg, #4f6df5, #6366f1) !important;
+            background: linear-gradient(
+                135deg,
+                #4f6df5,
+                #6366f1
+            ) !important;
+
             border: 1px solid #6478f6 !important;
             color: white !important;
         }

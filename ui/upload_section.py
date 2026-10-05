@@ -1,59 +1,65 @@
 from pathlib import Path
 from uuid import uuid4
-from pathlib import Path
 
 import streamlit as st
 
 
-def render_upload_section(root_dir, sample_zip_path, ingestion_service, retrieval_service):
-    st.markdown(
-        '<div class="section-title">Try the demo</div>',
-        unsafe_allow_html=True,
-    )
+SUPPORTED_TYPES = [
+    "pdf",
+    "doc",
+    "docx",
+    "txt",
+    "md",
+    "xls",
+    "xlsx",
+    "csv",
+    "ppt",
+    "pptx",
+    "jpg",
+    "jpeg",
+    "png",
+    "html",
+    "htm",
+    "xml",
+    "json",
+    "zip",
+]
 
-    st.write(
-        "Explore the system with preloaded sample documents, "
-        "or upload your own files."
-    )
 
-
-    sample_col, upload_col = st.columns([1, 1], gap="medium")
-
-
-    with sample_col:
-
+def render_upload_section(
+    root_dir,
+    sample_zip_path,
+    ingestion_service,
+    retrieval_service,
+):
+    with st.sidebar:
         st.markdown(
-            """
-            <div class="demo-card">
-                <div class="demo-card-title">✨ Explore with sample documents</div>
-                <div class="demo-card-text">
-                    Load the built-in multi-format demo files and try the suggested questions.
-                </div>
-            </div>
-            """,
+            '<div class="sidebar-title">📚 Documents</div>',
             unsafe_allow_html=True,
         )
 
+        st.caption(
+            "Load sample documents or upload your own files."
+        )
+
+        st.markdown("### Sample Documents")
+
         if st.button(
-            "Try Sample Documents",
+            "✨ Load Sample Documents",
             type="primary",
             use_container_width=True,
+            key="load_sample_documents",
         ):
-
             if not sample_zip_path.exists():
-
                 st.error(
                     "Sample documents are not available."
                 )
 
             else:
-
                 try:
-
                     with st.spinner(
                         "Loading sample documents..."
                     ):
-
                         results = (
                             ingestion_service.ingest_zip(
                                 sample_zip_path
@@ -74,159 +80,113 @@ def render_upload_section(root_dir, sample_zip_path, ingestion_service, retrieva
                     )
 
                 except Exception as error:
-
                     st.error(
                         f"Unable to load sample documents: {error}"
                     )
 
-
-    with upload_col:
+        st.markdown("### Upload Documents")
 
         uploaded_files = st.file_uploader(
-            "Upload documents",
+            "Choose files",
             accept_multiple_files=True,
-            type=[
-                "pdf",
-                "doc",
-                "docx",
-                "txt",
-                "md",
-                "xls",
-                "xlsx",
-                "csv",
-                "ppt",
-                "pptx",
-                "jpg",
-                "jpeg",
-                "png",
-                "html",
-                "htm",
-                "xml",
-                "json",
-                "zip",
-            ],
-            label_visibility="collapsed",
+            type=SUPPORTED_TYPES,
             help="Maximum 200 MB per file",
+            key="document_uploader",
         )
 
-        st.markdown(
-            '<div class="upload-help">PDF, DOCX, TXT, MD, XLSX, CSV, PPTX, JPG, PNG, HTML, XML, JSON and ZIP · up to 200 MB per file</div>',
-            unsafe_allow_html=True,
-        )
+        if uploaded_files:
+            if st.button(
+                "Process Uploaded Documents",
+                use_container_width=True,
+                key="process_uploaded_documents",
+            ):
+                upload_dir = root_dir / "uploads"
 
+                upload_dir.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
 
-    if uploaded_files:
+                results = []
 
-        if st.button(
-            "Process Uploaded Documents",
-            use_container_width=True,
-        ):
+                try:
+                    with st.spinner(
+                        "Processing your documents..."
+                    ):
+                        for file in uploaded_files:
+                            extension = Path(
+                                file.name
+                            ).suffix.lower()
 
-            upload_dir = root_dir / "uploads"
-            upload_dir.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
-            results = []
-
-            try:
-
-                with st.spinner(
-                    "Processing your documents..."
-                ):
-
-                    for file in uploaded_files:
-
-                        extension = Path(
-                            file.name
-                        ).suffix.lower()
-
-                        file_path = (
-                            upload_dir
-                            / f"{uuid4()}{extension}"
-                        )
-
-                        file_path.write_bytes(
-                            file.getvalue()
-                        )
-
-                        if file.name.lower().endswith(
-                            ".zip"
-                        ):
-
-                            zip_results = (
-                                ingestion_service.ingest_zip(
-                                    file_path
-                                )
+                            file_path = (
+                                upload_dir
+                                / f"{uuid4()}{extension}"
                             )
 
-                            for result in zip_results:
+                            file_path.write_bytes(
+                                file.getvalue()
+                            )
+
+                            if file.name.lower().endswith(
+                                ".zip"
+                            ):
+                                zip_results = (
+                                    ingestion_service.ingest_zip(
+                                        file_path
+                                    )
+                                )
+
+                                for result in zip_results:
+                                    results.append(
+                                        {
+                                            "filename": result[
+                                                "source_file"
+                                            ],
+                                            "cached": result[
+                                                "cached"
+                                            ],
+                                        }
+                                    )
+
+                            else:
+                                result = (
+                                    ingestion_service.ingest(
+                                        file_path,
+                                        original_filename=file.name,
+                                    )
+                                )
 
                                 results.append(
                                     {
-                                        "filename": result[
-                                            "source_file"
-                                        ],
+                                        "filename": file.name,
                                         "cached": result[
                                             "cached"
                                         ],
                                     }
                                 )
 
-                        else:
+                        retrieval_service.refresh_index()
 
-                            result = (
-                                ingestion_service.ingest(
-                                    file_path,
-                                    original_filename=file.name,
-                                )
+                        for result in results:
+                            st.session_state.loaded_documents.add(
+                                result["filename"]
                             )
 
-                            results.append(
-                                {
-                                    "filename": file.name,
-                                    "cached": result[
-                                        "cached"
-                                    ],
-                                }
-                            )
+                    st.success(
+                        f"Loaded {len(results)} document(s)."
+                    )
 
-                    retrieval_service.refresh_index()
+                except Exception as error:
+                    st.error(
+                        f"Document processing failed: {error}"
+                    )
 
-                    for result in results:
-                        st.session_state.loaded_documents.add(
-                            result["filename"]
-                        )
+        if st.session_state.loaded_documents:
+            st.markdown("### Loaded Documents")
 
-                st.success(
-                    f"Loaded {len(results)} document(s)."
+            for document in sorted(
+                st.session_state.loaded_documents
+            ):
+                st.markdown(
+                    f"📄 {document}"
                 )
-
-            except Exception as error:
-
-                st.error(
-                    f"Document processing failed: {error}"
-                )
-
-
-
-    if st.session_state.loaded_documents:
-
-        st.markdown(
-            '<div class="section-title">Documents in this session</div>',
-            unsafe_allow_html=True,
-        )
-
-        for document in sorted(
-            st.session_state.loaded_documents
-        ):
-
-            st.markdown(
-                f"📄 `{document}`"
-            )
-
-
-    st.divider()
-
-
