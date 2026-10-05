@@ -17,32 +17,24 @@ TEXT_SAMPLE_QUERIES = [
     {
         "question": "What types of blood diseases does Roche develop medicines for?",
         "document": "scanned.pdf",
-    }
+    },
 ]
 
 
 VISION_SAMPLE_QUERIES = [
     {
-        "question": (
-            "Look at Figure 15. What type of visualization is used to display malaria service readiness results?"
-        ),
+        "question": "Look at Figure 15. What type of visualization is used to display malaria service readiness results?",
         "document": "hhfa.pdf",
     },
     {
-        "question": (
-            "What does the A2 albuminuria category represent?"
-        ),
+        "question": "What does the A2 albuminuria category represent?",
         "document": "visual.pdf",
-            
     },
     {
-        "question": (
-            "How many facilities were included in the national analysis shown in the table?"
-        ),
+        "question": "How many facilities were included in the national analysis shown in the table?",
         "document": "hhfa.pdf",
     },
 ]
-
 
 
 def _run_question(
@@ -69,7 +61,6 @@ def _render_sample_questions(
     answer_service,
     key_prefix,
 ):
-
     st.markdown(
         f'<div class="section-title">{title}</div>',
         unsafe_allow_html=True,
@@ -78,7 +69,6 @@ def _render_sample_questions(
     for index, item in enumerate(
         questions
     ):
-
         question = item["question"]
         document = item["document"]
 
@@ -94,16 +84,13 @@ def _render_sample_questions(
                 key=f"{key_prefix}_{index}",
                 use_container_width=True,
             ):
-
                 try:
-
                     _run_question(
                         question,
                         answer_service,
                     )
 
                 except Exception as error:
-
                     st.session_state.answer = None
 
                     st.error(
@@ -134,7 +121,6 @@ def _render_sample_questions(
 def render_question_section(
     answer_service,
 ):
-
     if st.session_state.sample_loaded:
 
         st.markdown(
@@ -187,9 +173,9 @@ def render_question_section(
 
         with query_col:
 
-            st.text_input(
+            query = st.text_input(
                 "Question",
-                key="query_input",
+                value=st.session_state.query,
                 placeholder=(
                     "Ask anything about your documents..."
                 ),
@@ -208,7 +194,6 @@ def render_question_section(
 
     if search_submitted:
 
-        query = st.session_state.query_input
         st.session_state.query = query
 
         if not query.strip():
