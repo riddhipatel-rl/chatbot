@@ -16,8 +16,8 @@ class RRFFusion:
                 start=1,
             ):
                 scores[chunk_id] = (
-                    scores.get(chunk_id, 0.0)
-                    + 1.0 / (self.k + rank)
+                    scores.get(chunk_id, 0.0) #get the rank score of the chunk_id, if it doesn't exist, return 0.0
+                    + 1.0 / (self.k + rank)  #formula of RRF is 1 / (k + rank)
                 )
 
         ranked = sorted(
