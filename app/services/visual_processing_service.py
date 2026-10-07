@@ -30,6 +30,28 @@ class VisualProcessingService:
             print("❌ No render_path")
             return []
 
+        file_type = Path(render_path).suffix.lower()
+
+        if file_type in {".png", ".jpg", ".jpeg"}:
+
+            print("🖼️ Processing image directly")
+
+            vision_result = self.vision_extractor.extract(
+                image_path=Path(render_path),
+                query=query,
+                page_number=1,
+            )
+
+            print("✅ Vision extraction completed")
+
+            return [
+                {
+                    "page": 1,
+                    "image_path": str(render_path),
+                    "visual_result": vision_result,
+                }
+            ]
+
         pages = sorted(
             {
                 location.page

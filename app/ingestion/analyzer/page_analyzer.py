@@ -66,7 +66,7 @@ class PDFPageAnalyzer:
         has_vector_graphics = bool(drawings)
 
         is_visual_heavy = (
-            image_area_ratio >= 0.30
+            image_area_ratio >= 0.15
             or drawing_area_ratio >= 0.25
             or (
                 has_images

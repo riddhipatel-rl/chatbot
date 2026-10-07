@@ -72,7 +72,7 @@ class IngestionService:
         )
 
         existing = self.chunk_store.find_by_hash(
-            file_hash
+            file_hash 
         )
 
         if existing:
@@ -155,6 +155,7 @@ class IngestionService:
             ".jpg",
             ".jpeg",
         }:
+            render_path = file_path
 
             canonical = self.ocr_extractor.extract(
                 file_path
@@ -198,6 +199,7 @@ class IngestionService:
 
         for chunk in chunks:
             chunk.metadata["file_path"] = str(file_path)
+            chunk.metadata["file_type"] = extension
 
             if render_path:
                 chunk.metadata["render_path"] = str(render_path)

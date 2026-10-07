@@ -175,10 +175,8 @@ def render_question_section(
 
             query = st.text_input(
                 "Question",
-                value=st.session_state.query,
-                placeholder=(
-                    "Ask anything about your documents..."
-                ),
+                key="query_input",
+                placeholder="Ask anything about your documents...",
                 label_visibility="collapsed",
             )
 
