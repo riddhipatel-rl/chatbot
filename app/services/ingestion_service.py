@@ -150,6 +150,68 @@ class IngestionService:
             for order, element in enumerate(canonical.elements):
                 element.order = order
 
+        elif extension == ".pptx":
+
+            rendered_dir = Path("data/rendered")
+
+            rendered_pdf = self.document_renderer.render_to_pdf(
+                input_path=file_path,
+                output_dir=rendered_dir,
+            )
+
+            render_path = rendered_pdf
+
+            analyses = self.page_analyzer.analyze(
+                rendered_pdf
+            )
+
+            visual_pages = {
+                analysis.page_number
+                for analysis in analyses
+                if analysis.is_visual_heavy
+            }
+
+            normal_pages = {
+                analysis.page_number
+                for analysis in analyses
+                if not analysis.is_visual_heavy
+            }
+
+            print("========== PPTX PAGE ROUTING ==========")
+            print("Normal slides:", sorted(normal_pages))
+            print("Visual slides:", sorted(visual_pages))
+            print("=======================================")
+
+            document = self.converter.convert(
+                file_path
+            )
+
+            canonical = self.extractor.extract(
+                document,
+                source_file=source_file,
+            )
+
+            visual_elements = self.visual_metadata_extractor.extract(
+                rendered_pdf,
+                page_numbers=visual_pages,
+            )
+
+            canonical.elements.extend(
+                visual_elements
+            )
+
+            canonical.elements.sort(
+                key=lambda element: (
+                    element.location.page or 0,
+                    element.order,
+                )
+            )
+
+            for order, element in enumerate(
+                canonical.elements
+            ):
+                element.order = order
+
         elif extension in {
             ".png",
             ".jpg",
