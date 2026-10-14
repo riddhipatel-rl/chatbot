@@ -1,5 +1,8 @@
 from pathlib import Path
+import os
 
+from dotenv import load_dotenv
+from app.retrieval.embedding_service import EmbeddingService
 from torch import chunk
 
 from app.ingestion.chunker import DocumentChunker
@@ -20,6 +23,9 @@ from app.ingestion.extractor.xml_extractor import XMLExtractor
 from app.ingestion.extractor.pdf_extractor import PDFExtractor
 from app.ingestion.document_renderer import DocumentRenderer
 
+from app.db.database import SessionLocal
+from app.db.repositories.document_repository import DocumentRepository
+from app.db.repositories.chunk_repository import ChunkRepository
 from app.ingestion.analyzer.page_analyzer import PDFPageAnalyzer
 from app.ingestion.analyzer.page_router import PageRouter
 
@@ -42,6 +48,14 @@ class IngestionService:
         )
 
         self.chunk_store = LocalChunkStore()
+
+        load_dotenv()
+
+        self.db_enabled = bool(os.getenv("DATABASE_URL"))
+        self.embedding_service = (
+            EmbeddingService() if self.db_enabled else None
+        )
+
         self.ocr_extractor = RapidOCRExtractor()
         self.pdf_ocr = PDFOCRProcessor()
         self.zip_extractor = ZipExtractor()
@@ -290,6 +304,13 @@ class IngestionService:
             file_hash=file_hash,
             chunks=chunks,
         )
+        self._persist_to_postgres(
+            document_id=canonical.document_id,
+            source_file=canonical.source_file,
+            file_type=extension,
+            file_hash=file_hash,
+            chunks=chunks,
+        )
 
         return {
             "document_id": canonical.document_id,
@@ -331,3 +352,59 @@ class IngestionService:
             })
 
         return results
+
+    def _persist_to_postgres(
+        self,
+        document_id: str,
+        source_file: str,
+        file_type: str,
+        file_hash: str,
+        chunks: list,
+    ):
+        if not self.db_enabled:
+            return
+
+
+        embeddings = (
+            self.embedding_service.embed(
+                [chunk.text for chunk in chunks]
+            )
+            if chunks
+            else []
+        )
+
+        with SessionLocal.begin() as session:
+            document_repository = DocumentRepository(session)
+            chunk_repository = ChunkRepository(session)
+
+            existing_by_source = (
+                document_repository.get_by_source_file(source_file)
+            )
+            existing_by_hash = (
+                document_repository.get_by_hash(file_hash)
+            )
+
+            existing_documents = {
+                document.id: document
+                for document in (
+                    existing_by_source,
+                    existing_by_hash,
+                )
+                if document is not None
+            }
+
+            for existing_document in existing_documents.values():
+                document_repository.delete(existing_document.id)
+
+            document_repository.create(
+                document_id=document_id,
+                source_file=source_file,
+                file_type=file_type,
+                file_hash=file_hash,
+            )
+
+            for chunk, embedding in zip(chunks, embeddings):
+                chunk_repository.create(
+                    chunk=chunk,
+                    embedding=embedding.tolist(),
+                )

@@ -7,10 +7,8 @@ from app.retrieval.faiss_store import FAISSStore
 from app.retrieval.rrf import RRFFusion
 from app.retrieval.reranker import Reranker
 from app.storage.chunk_store import LocalChunkStore
-from app.services.visual_processing_service import (
-    VisualProcessingService,
-)
-
+from app.services.visual_processing_service import VisualProcessingService
+from app.retrieval.pgvector_retrieval import PgVectorRetriever
 
 class RetrievalService:
 
@@ -18,10 +16,12 @@ class RetrievalService:
         self.chunk_store = LocalChunkStore()
         self.embedding_service = EmbeddingService()
         self.faiss_store = FAISSStore(Path("data/vectorstore"))
+        self.pgvector_retriever = PgVectorRetriever()
 
         self.rrf = RRFFusion()
         self.reranker = Reranker()
         self.visual_processing_service = VisualProcessingService()
+        
 
         self.chunks = []
         self.bm25 = None
@@ -175,19 +175,6 @@ class RetrievalService:
 
             text_lower = chunk.text.lower()
 
-            if (
-                "9%" in text_lower
-                or "kdigo" in text_lower
-                or "patient population" in text_lower
-            ):
-                print("   >>> TARGET-RELATED CHUNK")
-                print(
-                    "   Text:",
-                    chunk.text[:700].replace("\n", " "),
-                )
-
-                if target_bm25_rank is None:
-                    target_bm25_rank = rank
 
         if target_bm25_rank is None:
             print(
@@ -205,10 +192,21 @@ class RetrievalService:
             [query]
         )[0]
 
-        dense_results = self.faiss_store.search(
-            query_embedding,
+        print("[DENSE] Retriever: PostgreSQL pgvector")
+
+        dense_results = self.pgvector_retriever.search(
+            embedding=query_embedding,
             top_k=candidate_k,
         )
+
+        print(f"[DENSE] PostgreSQL returned {len(dense_results)} results")
+
+        for rank, result in enumerate(dense_results[:5], start=1):
+            print(
+                f"[DENSE] Rank={rank} "
+                f"chunk_id={result['chunk_id']} "
+                f"score={result['score']:.4f}"
+            )
 
         print("\n==================== DENSE ====================")
         print("Dense candidates:", len(dense_results))

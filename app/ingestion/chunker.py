@@ -55,7 +55,8 @@ class DocumentChunker:
                 chunks.append(
                     self._create_chunk(
                         current_elements,
-                        document.source_file
+                        document.source_file,
+                        document.document_id,
                     )
                 )
 
@@ -70,6 +71,7 @@ class DocumentChunker:
                         self._create_chunk(
                             current_elements,
                             document.source_file,
+                            document.document_id,
                         )
                     )
 
@@ -85,6 +87,7 @@ class DocumentChunker:
                     self._create_chunk(
                         current_elements,
                         document.source_file,
+                        document.document_id,
                     )
                 )
 
@@ -108,6 +111,7 @@ class DocumentChunker:
                 self._create_chunk(
                     current_elements,
                     document.source_file,
+                    document.document_id,
                 )
             )
 
@@ -117,15 +121,12 @@ class DocumentChunker:
         self,
         elements: list[DocumentElement],
         source_file: str,
+        document_id: str,
     ) -> DocumentChunk:
 
         text = "\n".join(
             element.text
             for element in elements
-        )
-
-        document_id = elements[0].metadata.get(
-            "document_id"
         )
 
         visual_metadata = []

@@ -14,3 +14,7 @@ groq==1.7.0
 python-dotenv==1.2.3
 sentence-transformers
 faiss-cpu
+sqlalchemy
+alembic
+psycopg[binary]
+pgvector
