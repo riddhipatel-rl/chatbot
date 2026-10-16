@@ -4,8 +4,8 @@ from dataclasses import asdict, is_dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Chunk, EMBEDDING_DIMENSION
-from app.ingestion.models import DocumentChunk
+from app.db.models import Chunk, Document, EMBEDDING_DIMENSION
+from app.ingestion.models import DocumentChunk, SourceLocation
 
 
 class ChunkRepository:
@@ -52,6 +52,34 @@ class ChunkRepository:
             .order_by(Chunk.id)
         )
         return list(self.session.scalars(statement).all())
+
+    def get_latest_document_chunks(self) -> list[DocumentChunk]:
+        statement = (
+            select(Chunk, Document.source_file)
+            .join(Document, Chunk.document_id == Document.id)
+            .where(Document.is_latest.is_(True))
+            .order_by(Document.source_file, Chunk.id)
+        )
+
+        rows = self.session.execute(statement).all()
+
+        return [
+            DocumentChunk(
+                chunk_id=chunk.id,
+                document_id=chunk.document_id,
+                text=chunk.text,
+                source_file=source_file,
+                locations=[
+                    SourceLocation(**location)
+                    if isinstance(location, dict)
+                    else location
+                    for location in (chunk.locations or [])
+                ],
+                element_types=chunk.element_types or [],
+                metadata=chunk.metadata_ or {},
+            )
+            for chunk, source_file in rows
+        ]
 
     def similarity_search(
         self,

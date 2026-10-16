@@ -11,7 +11,7 @@ from app.ingestion.docling_converter import (
     DoclingConverter,
 )
 from app.ingestion.extractor.docling_extractor import DoclingExtractor
-from app.storage.chunk_store import LocalChunkStore
+
 from app.storage.file_store import calculate_file_hash
 from app.ingestion.extractor.ocr_extractor import RapidOCRExtractor
 
@@ -28,6 +28,7 @@ from app.db.repositories.document_repository import DocumentRepository
 from app.db.repositories.chunk_repository import ChunkRepository
 from app.ingestion.analyzer.page_analyzer import PDFPageAnalyzer
 from app.ingestion.analyzer.page_router import PageRouter
+from app.ingestion.models import DocumentChunk, SourceLocation
 
 from app.ingestion.extractor.visual_metadata_extractor import (
     VisualMetadataExtractor,
@@ -47,7 +48,6 @@ class IngestionService:
             overlap_tokens=100,
         )
 
-        self.chunk_store = LocalChunkStore()
 
         load_dotenv()
 
@@ -84,35 +84,50 @@ class IngestionService:
         file_hash = calculate_file_hash(
             file_path
         )
+       
 
-        existing = self.chunk_store.find_by_hash(
-            file_hash 
+        version_state = self._get_version_state(
+            source_file=source_file,
+            file_hash=file_hash,
         )
 
-        if existing:
+        matching = version_state["matching"]
 
-            document_id, chunks = existing
+        if matching is not None:
+            document_id = matching["document_id"]
+
+            chunks = self._load_postgres_chunks(
+                document_id=document_id,
+                source_file=matching["source_file"],
+            )
 
             return {
                 "document_id": document_id,
-                "source_file": file_path.name,
+                "source_file": matching["source_file"],
                 "file_hash": file_hash,
+                "logical_document_id": matching["logical_document_id"],
+                "version_number": matching["version_number"],
                 "chunks": chunks,
                 "cached": True,
             }
-        
-        existing_document = self.chunk_store.find_by_source_file(
-            source_file
+
+        latest = version_state["latest"]
+
+        logical_document_id = (
+            latest["logical_document_id"]
+            if latest is not None
+            else None
         )
+
+        version_number = (
+            version_state["next_version_number"]
+            if latest is not None
+            else 1
+        )
+
+        
         document_id = None
 
-        if existing_document:
-            document_id, old_hash, _ = existing_document
-
-            if old_hash != file_hash:
-                self.chunk_store.delete(
-                    document_id
-                )
 
         extension = file_path.suffix.lower()
         render_path = None
@@ -298,24 +313,27 @@ class IngestionService:
 
         print("===============================================")
 
-        self.chunk_store.save(
-            document_id=canonical.document_id,
-            source_file=canonical.source_file,
-            file_hash=file_hash,
-            chunks=chunks,
-        )
-        self._persist_to_postgres(
-            document_id=canonical.document_id,
-            source_file=canonical.source_file,
-            file_type=extension,
-            file_hash=file_hash,
-            chunks=chunks,
-        )
+        if logical_document_id is None:
+            logical_document_id = canonical.document_id
+
+        if self.db_enabled:
+            self._persist_to_postgres(
+                document_id=canonical.document_id,
+                logical_document_id=logical_document_id,
+                version_number=version_number,
+                source_file=canonical.source_file,
+                file_type=extension,
+                file_hash=file_hash,
+                chunks=chunks,
+            )
+
 
         return {
             "document_id": canonical.document_id,
             "source_file": canonical.source_file,
             "file_hash": file_hash,
+            "logical_document_id": logical_document_id,
+            "version_number": version_number,
             "chunks": chunks,
             "cached": False,
         }
@@ -356,6 +374,8 @@ class IngestionService:
     def _persist_to_postgres(
         self,
         document_id: str,
+        logical_document_id: str,
+        version_number: int,
         source_file: str,
         file_type: str,
         file_hash: str,
@@ -363,7 +383,6 @@ class IngestionService:
     ):
         if not self.db_enabled:
             return
-
 
         embeddings = (
             self.embedding_service.embed(
@@ -377,30 +396,18 @@ class IngestionService:
             document_repository = DocumentRepository(session)
             chunk_repository = ChunkRepository(session)
 
-            existing_by_source = (
-                document_repository.get_by_source_file(source_file)
+            document_repository.mark_versions_not_latest(
+                logical_document_id=logical_document_id,
             )
-            existing_by_hash = (
-                document_repository.get_by_hash(file_hash)
-            )
-
-            existing_documents = {
-                document.id: document
-                for document in (
-                    existing_by_source,
-                    existing_by_hash,
-                )
-                if document is not None
-            }
-
-            for existing_document in existing_documents.values():
-                document_repository.delete(existing_document.id)
 
             document_repository.create(
                 document_id=document_id,
                 source_file=source_file,
                 file_type=file_type,
                 file_hash=file_hash,
+                logical_document_id=logical_document_id,
+                version_number=version_number,
+                is_latest=True,
             )
 
             for chunk, embedding in zip(chunks, embeddings):
@@ -408,3 +415,102 @@ class IngestionService:
                     chunk=chunk,
                     embedding=embedding.tolist(),
                 )
+
+    def _get_version_state(
+        self,
+        source_file: str,
+        file_hash: str,
+    ) -> dict:
+        if not self.db_enabled:
+            return {
+                "latest": None,
+                "matching": None,
+                "next_version_number": 1,
+            }
+
+        with SessionLocal.begin() as session:
+            repository = DocumentRepository(session)
+
+            latest = repository.get_by_source_file(source_file)
+
+            if latest is None:
+                return {
+                    "latest": None,
+                    "matching": None,
+                    "next_version_number": 1,
+                }
+
+            logical_document_id = latest.logical_document_id
+
+            latest_state = {
+                "document_id": latest.id,
+                "source_file": latest.source_file,
+                "file_type": latest.file_type,
+                "file_hash": latest.file_hash,
+                "logical_document_id": logical_document_id,
+                "version_number": latest.version_number,
+            }
+
+            matching = repository.get_by_hash_for_logical_document(
+                logical_document_id=logical_document_id,
+                file_hash=file_hash,
+            )
+
+            matching_state = None
+
+            if matching is not None:
+                matching_state = {
+                    "document_id": matching.id,
+                    "source_file": matching.source_file,
+                    "file_type": matching.file_type,
+                    "file_hash": matching.file_hash,
+                    "logical_document_id": logical_document_id,
+                    "version_number": matching.version_number,
+                }
+
+                repository.activate_version(
+                    logical_document_id=logical_document_id,
+                    document_id=matching.id,
+                )
+
+            return {
+                "latest": latest_state,
+                "matching": matching_state,
+                "next_version_number": (
+                    repository.get_next_version_number(logical_document_id)
+                ),
+            }
+
+    def _load_postgres_chunks(
+        self,
+        document_id: str,
+        source_file: str,
+    ) -> list[DocumentChunk]:
+        with SessionLocal() as session:
+            repository = ChunkRepository(session)
+
+            stored_chunks = repository.get_by_document_id(document_id)
+
+            chunks = []
+
+            for stored in stored_chunks:
+                locations = [
+                    SourceLocation(**location)
+                    if isinstance(location, dict)
+                    else location
+                    for location in (stored.locations or [])
+                ]
+
+                chunks.append(
+                    DocumentChunk(
+                        chunk_id=stored.id,
+                        document_id=stored.document_id,
+                        text=stored.text,
+                        source_file=source_file,
+                        locations=locations,
+                        element_types=stored.element_types or [],
+                        metadata=stored.metadata_ or {},
+                    )
+                )
+
+            return chunks

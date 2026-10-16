@@ -1,21 +1,18 @@
-from pathlib import Path
 import re
 
 from app.retrieval.bm25_search import BM25Retriever
 from app.retrieval.embedding_service import EmbeddingService
-from app.retrieval.faiss_store import FAISSStore
+from app.db.database import SessionLocal
+from app.db.repositories.chunk_repository import ChunkRepository
 from app.retrieval.rrf import RRFFusion
 from app.retrieval.reranker import Reranker
-from app.storage.chunk_store import LocalChunkStore
 from app.services.visual_processing_service import VisualProcessingService
 from app.retrieval.pgvector_retrieval import PgVectorRetriever
 
 class RetrievalService:
 
     def __init__(self):
-        self.chunk_store = LocalChunkStore()
         self.embedding_service = EmbeddingService()
-        self.faiss_store = FAISSStore(Path("data/vectorstore"))
         self.pgvector_retriever = PgVectorRetriever()
 
         self.rrf = RRFFusion()
@@ -29,25 +26,26 @@ class RetrievalService:
         #self.refresh()
 
     def refresh(self):
-        self.chunks = self.chunk_store.load_all()
+        with SessionLocal() as session:
+            repository = ChunkRepository(session)
+            self.chunks = repository.get_latest_document_chunks()
+            print(
+                f"[STORAGE] Loaded {len(self.chunks)} chunks from PostgreSQL"
+            )
+            print(f"[STORAGE] BM25 initialized: {self.bm25 is not None}")
 
         if not self.chunks:
             self.bm25 = None
-            self.faiss_store.index = None
-            self.faiss_store.chunk_ids = []
+            print("[RETRIEVAL] No latest-version chunks found in PostgreSQL.")
             return
 
         self.bm25 = BM25Retriever(self.chunks)
 
-        texts = [chunk.text for chunk in self.chunks]
-        chunk_ids = [chunk.chunk_id for chunk in self.chunks]
-
-        embeddings = self.embedding_service.embed(texts)
-
-        self.faiss_store.build(
-            chunk_ids=chunk_ids,
-            embeddings=embeddings,
+        print(
+            f"[RETRIEVAL] Loaded {len(self.chunks)} "
+            "latest-version chunks from PostgreSQL."
         )
+        print("[RETRIEVAL] BM25 index refreshed.")
 
     def refresh_index(self):
         self.refresh()
@@ -193,6 +191,7 @@ class RetrievalService:
         )[0]
 
         print("[DENSE] Retriever: PostgreSQL pgvector")
+        print("[DENSE] Searching PostgreSQL via pgvector")
 
         dense_results = self.pgvector_retriever.search(
             embedding=query_embedding,

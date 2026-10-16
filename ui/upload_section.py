@@ -2,7 +2,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import streamlit as st
-
+import traceback
 
 SUPPORTED_TYPES = [
     "pdf",
@@ -177,6 +177,7 @@ def render_upload_section(
                     )
 
                 except Exception as error:
+                    traceback.print_exc()
                     st.error(
                         f"Document processing failed: {error}"
                     )

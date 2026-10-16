@@ -1,14 +1,8 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import (
-    DateTime,
-    ForeignKey,
-    JSON,
-    String,
-    Text,
-    func,
-)
+from sqlalchemy import DateTime, ForeignKey, JSON, String, Text, func, Integer, Boolean, UniqueConstraint, Index, text
+
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -19,6 +13,25 @@ EMBEDDING_DIMENSION = 384
 
 class Document(Base):
     __tablename__ = "documents"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "logical_document_id",
+            "file_hash",
+            name="uq_documents_logical_document_hash",
+        ),
+        Index(
+            "ix_documents_source_file_latest",
+            "source_file",
+            "is_latest",
+        ),
+        Index(
+            "uq_documents_one_latest_per_logical_document",
+            "logical_document_id",
+            unique=True,
+            postgresql_where=text("is_latest IS TRUE"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36),
@@ -37,9 +50,25 @@ class Document(Base):
 
     file_hash: Mapped[str] = mapped_column(
         String(64),
-        unique=True,
         nullable=False,
         index=True,
+    )
+
+    logical_document_id: Mapped[str] = mapped_column(
+        String(36),
+        nullable=False,
+        index=True,
+    )
+
+    version_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    is_latest: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
