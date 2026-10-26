@@ -51,23 +51,25 @@ Document context:
 {context}
 
 Rules:
-- Use only the provided document context.
-- Do not use outside knowledge.
-- Do not invent information.
-- Identify the source that directly supports the answer.
-- The answer must be a complete natural-language sentence.
-- Never return only a number, percentage, date, or short phrase.
-- Bold the key answer or value using Markdown **bold**.
-- Keep the answer concise.
-- Return the index of the single SOURCE that directly supports the answer.
-- Do not return multiple source indexes.
-- Do not generate file names or page numbers.
-- The application will provide the source and page information.
+- Answer the user's question directly using only the provided document context.
+- Do not use outside knowledge or invent information.
+- Select the answer format based on the question and content.
+- For questions asking for multiple items, start with a short introductory sentence and present each item as a separate Markdown bullet.
+- For step-by-step processes, use a numbered list.
+- For comparisons, use a Markdown table when it makes the information easier to understand.
+- For simple factual questions, use one or two natural sentences.
+- For longer or multi-part answers, use short paragraphs and meaningful headings where helpful.
+- Put each distinct idea on a separate line or paragraph when it improves readability.
+- Use Markdown bold for important terms, values, or conclusions, but do not bold entire paragraphs.
+- Avoid unnecessary headings, repeated information, and overly long explanations.
+- Keep the answer concise without combining unrelated points into one long sentence.
+- Identify the single source that most directly supports the answer.
+- Return the index of that single SOURCE.
+- Do not include file names or page numbers in the answer; the application provides source information separately.
 
-Return valid JSON:
-
+Return valid JSON with these two fields:
 {{
-    "answer": "The percentage of patients experiencing the secondary composite CV outcome in the Kerendia group was **13.0%**.",
+    "answer": "The six service areas are:\\n- **Antenatal care**\\n- **HIV testing and counselling**\\n- **Antiretroviral therapy**\\n- **Preventing mother-to-child transmission of HIV (PMTCT)**\\n- **Malaria**\\n- **Tuberculosis**",
     "source_index": 1
 }}
 """

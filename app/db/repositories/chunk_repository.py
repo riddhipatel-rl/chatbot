@@ -116,3 +116,26 @@ class ChunkRepository:
             (chunk, float(distance_value))
             for chunk, distance_value in rows
         ]
+
+    def update_document_file_paths(
+        self,
+        document_id: str,
+        file_path: str,
+        file_type: str,
+        render_path: str | None,
+    ) -> None:
+        chunks = self.get_by_document_id(document_id)
+
+        for chunk in chunks:
+            metadata = dict(chunk.metadata_ or {})
+            metadata["file_path"] = file_path
+            metadata["file_type"] = file_type
+
+            if render_path:
+                metadata["render_path"] = render_path
+            else:
+                metadata.pop("render_path", None)
+
+            chunk.metadata_ = metadata
+
+        self.session.flush()

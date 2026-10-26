@@ -95,6 +95,52 @@ class IngestionService:
 
         if matching is not None:
             document_id = matching["document_id"]
+            extension = file_path.suffix.lower()
+
+            render_path = None
+
+            if extension == ".pdf":
+                render_path = file_path.resolve()
+
+            elif extension in {".docx", ".pptx"}:
+                rendered_dir = (
+                    Path("data/rendered")
+                    / document_id
+                )
+
+                rendered_pdf_path = (
+                    rendered_dir
+                    / f"{file_path.stem}.pdf"
+                )
+
+                if rendered_pdf_path.exists():
+                    rendered_pdf_path.unlink()
+
+                rendered_pdf = (
+                    self.document_renderer.render_to_pdf(
+                        input_path=file_path,
+                        output_dir=rendered_dir,
+                    )
+                )
+
+                render_path = rendered_pdf.resolve()
+
+            elif extension in {".png", ".jpg", ".jpeg"}:
+                render_path = file_path.resolve()
+
+            with SessionLocal.begin() as session:
+                repository = ChunkRepository(session)
+
+                repository.update_document_file_paths(
+                    document_id=document_id,
+                    file_path=str(file_path.resolve()),
+                    file_type=extension,
+                    render_path=(
+                        str(render_path)
+                        if render_path
+                        else None
+                    ),
+                )
 
             chunks = self._load_postgres_chunks(
                 document_id=document_id,
@@ -105,7 +151,9 @@ class IngestionService:
                 "document_id": document_id,
                 "source_file": matching["source_file"],
                 "file_hash": file_hash,
-                "logical_document_id": matching["logical_document_id"],
+                "logical_document_id": matching[
+                    "logical_document_id"
+                ],
                 "version_number": matching["version_number"],
                 "chunks": chunks,
                 "cached": True,
