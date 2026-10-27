@@ -5,7 +5,7 @@ from app.ingestion.analyzer.page_analyzer import PDFPageAnalyzer
 from app.ingestion.analyzer.page_renderer import PDFPageRenderer
 from app.ingestion.extractor.vision_extractor import VisionExtractor
 from app.ingestion.models import DocumentChunk
-
+from app.storage.filebase_storage import FilebaseStorage
 
 class VisualProcessingService:
 
@@ -13,6 +13,7 @@ class VisualProcessingService:
         self.page_analyzer = PDFPageAnalyzer()
         self.renderer = PDFPageRenderer()
         self.vision_extractor = VisionExtractor()
+        self.file_storage = FilebaseStorage()
 
     def process_chunk(
         self,
@@ -24,13 +25,32 @@ class VisualProcessingService:
         print("Chunk:", chunk.chunk_id)
         print("Query:", query)
 
-        render_path = chunk.metadata.get("render_path")
+        render_storage_key = chunk.metadata.get(
+            "render_storage_key"
+        )
 
-        if not render_path:
-            print("❌ No render_path")
+        if render_storage_key:
+            render_path = self.file_storage.download_to_cache(
+                render_storage_key
+            )
+            render_path = Path(render_path)
+
+            print("[VISUAL] Retrieved file from Filebase:", render_storage_key)
+
+        else:
+            render_path = chunk.metadata.get("render_path")
+
+            if not render_path:
+                print("[VISUAL] No render path or Filebase storage key.")
+                return []
+
+            render_path = Path(render_path)
+
+        if not render_path.is_file():
+            print("[VISUAL] File does not exist:", render_path)
             return []
 
-        file_type = Path(render_path).suffix.lower()
+        file_type = render_path.suffix.lower()
 
         if file_type in {".png", ".jpg", ".jpeg"}:
 

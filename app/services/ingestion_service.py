@@ -34,6 +34,8 @@ from app.ingestion.extractor.visual_metadata_extractor import (
     VisualMetadataExtractor,
 )
 
+from app.storage.filebase_storage import FilebaseStorage
+
 from collections import Counter
 class IngestionService:
 
@@ -65,6 +67,7 @@ class IngestionService:
         self.page_analyzer = PDFPageAnalyzer()
         self.page_router = PageRouter()
         self.visual_metadata_extractor = VisualMetadataExtractor()
+        self.file_storage = FilebaseStorage()
 
     def ingest(
         self,
@@ -84,6 +87,12 @@ class IngestionService:
         file_hash = calculate_file_hash(
             file_path
         )
+        extension = file_path.suffix.lower()
+
+        storage_key = self.file_storage.upload_file(
+            file_path,
+            f"documents/{file_hash}{extension}",
+        )
        
 
         version_state = self._get_version_state(
@@ -95,17 +104,22 @@ class IngestionService:
 
         if matching is not None:
             document_id = matching["document_id"]
-            extension = file_path.suffix.lower()
 
             render_path = None
+            render_storage_key = None
 
             if extension == ".pdf":
                 render_path = file_path.resolve()
+                render_storage_key = storage_key
 
             elif extension in {".docx", ".pptx"}:
                 rendered_dir = (
                     Path("data/rendered")
                     / document_id
+                )
+                rendered_dir.mkdir(
+                    parents=True,
+                    exist_ok=True,
                 )
 
                 rendered_pdf_path = (
@@ -113,20 +127,23 @@ class IngestionService:
                     / f"{file_path.stem}.pdf"
                 )
 
-                if rendered_pdf_path.exists():
-                    rendered_pdf_path.unlink()
+                rendered_pdf_path.unlink(missing_ok=True)
 
-                rendered_pdf = (
-                    self.document_renderer.render_to_pdf(
-                        input_path=file_path,
-                        output_dir=rendered_dir,
-                    )
+                rendered_pdf = self.document_renderer.render_to_pdf(
+                    input_path=file_path,
+                    output_dir=rendered_dir,
                 )
 
                 render_path = rendered_pdf.resolve()
 
+                render_storage_key = self.file_storage.upload_file(
+                    rendered_pdf,
+                    f"rendered/{file_hash}/{extension.lstrip('.')}.pdf",
+                )
+
             elif extension in {".png", ".jpg", ".jpeg"}:
                 render_path = file_path.resolve()
+                render_storage_key = storage_key
 
             with SessionLocal.begin() as session:
                 repository = ChunkRepository(session)
@@ -140,6 +157,8 @@ class IngestionService:
                         if render_path
                         else None
                     ),
+                    storage_key=storage_key,
+                    render_storage_key=render_storage_key,
                 )
 
             chunks = self._load_postgres_chunks(
@@ -179,10 +198,12 @@ class IngestionService:
 
         extension = file_path.suffix.lower()
         render_path = None
+        render_storage_key = None
 
         if extension == ".pdf":
 
             render_path = file_path
+            render_storage_key = storage_key
 
             analyses = self.page_analyzer.analyze(file_path)
 
@@ -229,7 +250,7 @@ class IngestionService:
 
         elif extension == ".pptx":
 
-            rendered_dir = Path("data/rendered")
+            rendered_dir = Path("data/rendered") / file_hash
 
             rendered_pdf = self.document_renderer.render_to_pdf(
                 input_path=file_path,
@@ -237,6 +258,11 @@ class IngestionService:
             )
 
             render_path = rendered_pdf
+
+            render_storage_key = self.file_storage.upload_file(
+                rendered_pdf,
+                f"rendered/{file_hash}/pptx.pdf",
+            )
 
             analyses = self.page_analyzer.analyze(
                 rendered_pdf
@@ -295,6 +321,7 @@ class IngestionService:
             ".jpeg",
         }:
             render_path = file_path
+            render_storage_key = storage_key
 
             canonical = self.ocr_extractor.extract(
                 file_path
@@ -308,11 +335,18 @@ class IngestionService:
             )
 
         elif extension == ".docx":
-            rendered_dir = Path("data/rendered")
+            rendered_dir = Path("data/rendered") / file_hash
 
             rendered_pdf = self.document_renderer.render_to_pdf(
                 input_path=file_path,
                 output_dir=rendered_dir,
+            )
+
+            render_path = rendered_pdf
+
+            render_storage_key = self.file_storage.upload_file(
+                rendered_pdf,
+                f"rendered/{file_hash}/docx.pdf",
             )
 
             canonical = self.pdf_extractor.extract(
@@ -337,17 +371,21 @@ class IngestionService:
         )
 
         for chunk in chunks:
-            chunk.metadata["file_path"] = str(file_path)
+            chunk.metadata["file_path"] = str(file_path.resolve())
             chunk.metadata["file_type"] = extension
+            chunk.metadata["storage_key"] = storage_key
 
             if render_path:
-                chunk.metadata["render_path"] = str(render_path)
+                chunk.metadata["render_path"] = str(
+                    Path(render_path).resolve()
+                )
+            else:
+                chunk.metadata.pop("render_path", None)
 
-            if extension == ".pdf":
-                chunk.metadata["render_path"] = str(file_path)
-
-            elif extension == ".docx":
-                chunk.metadata["render_path"] = str(rendered_pdf)
+            if render_storage_key:
+                chunk.metadata["render_storage_key"] = render_storage_key
+            else:
+                chunk.metadata.pop("render_storage_key", None)
 
         print("DEBUG CANONICAL:", canonical.source_file)
         print(

@@ -18,3 +18,4 @@ sqlalchemy
 alembic
 psycopg[binary]
 pgvector
+boto3
