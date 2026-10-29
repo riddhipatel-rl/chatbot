@@ -84,7 +84,8 @@ class FilebaseStorage:
             ExtraArgs={
                 "ContentType": (
                     content_type or "application/octet-stream"
-                )
+                ),
+                "ServerSideEncryption": "AES256",
             },
         )
 
