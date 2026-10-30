@@ -37,6 +37,8 @@ from app.ingestion.extractor.visual_metadata_extractor import (
 from app.storage.filebase_storage import FilebaseStorage
 
 from collections import Counter
+from app.core.tracing import trace_stage
+
 class IngestionService:
 
     def __init__(self):
@@ -366,9 +368,14 @@ class IngestionService:
                 source_file=source_file,
             )
 
-        chunks = self.chunker.chunk(
-            canonical
-        )
+        
+        with trace_stage(
+            "document_chunking",
+            document_id=canonical.document_id,
+        ) as metrics:
+            chunks = self.chunker.chunk(canonical)
+            metrics["chunk_count"] = len(chunks)
+
 
         for chunk in chunks:
             chunk.metadata["file_path"] = str(file_path.resolve())
@@ -470,13 +477,21 @@ class IngestionService:
         if not self.db_enabled:
             return
 
-        embeddings = (
-            self.embedding_service.embed(
-                [chunk.text for chunk in chunks]
+        
+        with trace_stage(
+            "embedding_generation",
+            document_id=document_id,
+            chunk_count=len(chunks),
+        ) as metrics:
+            embeddings = (
+                self.embedding_service.embed(
+                    [chunk.text for chunk in chunks]
+                )
+                if chunks
+                else []
             )
-            if chunks
-            else []
-        )
+            metrics["embedding_count"] = len(embeddings)
+
 
         with SessionLocal.begin() as session:
             document_repository = DocumentRepository(session)

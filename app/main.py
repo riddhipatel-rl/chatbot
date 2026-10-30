@@ -7,10 +7,18 @@ from app.api.retrieval import (
     router as retrieval_router,
 )
 
+from app.core.logging_config import configure_logging
+from app.core.middleware import RequestTracingMiddleware
+
+
 app = FastAPI(
     title="Document Chatbot API",
     version="1.0.0",
 )
+
+configure_logging()
+
+app.add_middleware(RequestTracingMiddleware)
 
 
 app.include_router(

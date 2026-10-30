@@ -8,6 +8,7 @@ from app.retrieval.rrf import RRFFusion
 from app.retrieval.reranker import Reranker
 from app.services.visual_processing_service import VisualProcessingService
 from app.retrieval.pgvector_retrieval import PgVectorRetriever
+from app.core.tracing import trace_stage
 
 class RetrievalService:
 
@@ -113,19 +114,10 @@ class RetrievalService:
         query: str,
         top_k: int = 5,
     ):
-        print("\n")
-        print("============================================================")
-        print("                    RETRIEVAL DEBUG")
-        print("============================================================")
-        print("Query:", query)
-        print("Top K:", top_k)
-        print("Total chunks:", len(self.chunks))
-        print("BM25 initialized:", self.bm25 is not None)
 
         page_number = self.extract_page_number(query)
 
         if not self.chunks:
-            print("❌ No chunks available")
             return []
 
         if page_number is not None:
@@ -144,13 +136,13 @@ class RetrievalService:
             for chunk in self.chunks
         }
 
-        bm25_results = self.bm25.search(
-            query,
-            k=candidate_k,
-        )
+        with trace_stage("bm25_search") as metrics:
+            bm25_results = self.bm25.search(
+                query,
+                k=candidate_k,
+            )
+            metrics["candidate_count"] = len(bm25_results)
 
-        print("\n==================== BM25 ====================")
-        print("BM25 candidates:", len(bm25_results))
 
         target_bm25_rank = None
 
@@ -164,51 +156,19 @@ class RetrievalService:
                 if location.page
             })
 
-            print(
-                f"BM25 #{rank:02d} | "
-                f"score={score:.4f} | "
-                f"pages={pages} | "
-                f"chunk={chunk.chunk_id}"
-            )
-
             text_lower = chunk.text.lower()
-
-
-        if target_bm25_rank is None:
-            print(
-                "❌ Target-related page-2 chunk "
-                "NOT FOUND in BM25 candidates"
-            )
-        else:
-            print(
-                f"✅ Target-related chunk found in BM25 "
-                f"at rank {target_bm25_rank}"
-            )
 
 
         query_embedding = self.embedding_service.embed(
             [query]
         )[0]
 
-        print("[DENSE] Retriever: PostgreSQL pgvector")
-        print("[DENSE] Searching PostgreSQL via pgvector")
 
         dense_results = self.pgvector_retriever.search(
             embedding=query_embedding,
             top_k=candidate_k,
         )
 
-        print(f"[DENSE] PostgreSQL returned {len(dense_results)} results")
-
-        for rank, result in enumerate(dense_results[:5], start=1):
-            print(
-                f"[DENSE] Rank={rank} "
-                f"chunk_id={result['chunk_id']} "
-                f"score={result['score']:.4f}"
-            )
-
-        print("\n==================== DENSE ====================")
-        print("Dense candidates:", len(dense_results))
 
         target_dense_rank = None
 
