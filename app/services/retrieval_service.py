@@ -198,26 +198,6 @@ class RetrievalService:
 
             text_lower = chunk.text.lower()
 
-            if (
-                "9%" in text_lower
-                or "kdigo" in text_lower
-                or "patient population" in text_lower
-            ):
-                print("   >>> TARGET-RELATED CHUNK")
-
-                if target_dense_rank is None:
-                    target_dense_rank = rank
-
-        if target_dense_rank is None:
-            print(
-                "❌ Target-related page-2 chunk "
-                "NOT FOUND in dense candidates"
-            )
-        else:
-            print(
-                f"✅ Target-related chunk found in Dense "
-                f"at rank {target_dense_rank}"
-            )
 
         bm25_ids = [
             chunk.chunk_id
@@ -283,16 +263,6 @@ class RetrievalService:
 
             text_lower = chunk.text.lower()
 
-            if (
-                "9%" in text_lower
-                or "kdigo" in text_lower
-                or "patient population" in text_lower
-            ):
-                print("   >>> TARGET-RELATED CHUNK")
-
-                if target_rrf_rank is None:
-                    target_rrf_rank = rank
-
             candidates.append(
                 {
                     "chunk": chunk,
@@ -308,23 +278,27 @@ class RetrievalService:
                 }
             )
 
-        if target_rrf_rank is None:
-            print(
-                "❌ Target-related page-2 chunk "
-                "NOT FOUND in RRF"
-            )
-        else:
-            print(
-                f"✅ Target-related chunk found in RRF "
-                f"at rank {target_rrf_rank}"
-            )
 
-
-        results = self.reranker.rerank(
-            query=query,
-            candidates=candidates,
-            top_k=top_k,
+        figure_reference = re.search(
+            r"\b(?:figure|fig(?:ure)?)[\s.:-]*\d+\b",
+            query,
+            re.IGNORECASE,
         )
+
+        if figure_reference:
+            print(
+                "[RETRIEVAL] Explicit figure reference detected. "
+                "Preserving RRF ranking."
+            )
+
+            results = candidates[:top_k]
+
+        else:
+            results = self.reranker.rerank(
+                query=query,
+                candidates=candidates,
+                top_k=top_k,
+            )
 
         print("\n================== RERANKER ==================")
         print("Reranked results:", len(results))
@@ -350,27 +324,6 @@ class RetrievalService:
             )
 
             text_lower = chunk.text.lower()
-
-            if (
-                "9%" in text_lower
-                or "kdigo" in text_lower
-                or "patient population" in text_lower
-            ):
-                print("   >>> TARGET-RELATED CHUNK")
-
-                if target_reranker_rank is None:
-                    target_reranker_rank = rank
-
-        if target_reranker_rank is None:
-            print(
-                "❌ Target-related page-2 chunk "
-                "NOT IN FINAL RESULTS"
-            )
-        else:
-            print(
-                f"✅ Target-related chunk is final result "
-                f"#{target_reranker_rank}"
-            )
 
         print("\n============================================================")
         print("                 RETRIEVAL DIAGNOSIS")
