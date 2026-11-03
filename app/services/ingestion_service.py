@@ -431,6 +431,7 @@ class IngestionService:
             "cached": False,
         }
 
+    
     def ingest_zip(
         self,
         zip_path: Path,
@@ -440,29 +441,38 @@ class IngestionService:
             / f"zip_{uuid4()}"
         )
 
-        extracted_files = self.zip_extractor.extract(
-            zip_path,
-            extract_dir,
-        )
-
         results = []
 
-        for file_path in extracted_files:
+        try:
+            extracted_files = self.zip_extractor.extract(
+                zip_path,
+                extract_dir,
+            )
 
-            if not is_supported(file_path.name):
-                continue
+            for file_path in extracted_files:
 
-            result = self.ingest(file_path)
+                if not is_supported(file_path.name):
+                    continue
 
-            results.append({
-                "document_id": result["document_id"],
-                "source_file": file_path.name,
-                "file_hash": result["file_hash"],
-                "chunks": len(result["chunks"]),
-                "cached": result["cached"],
-            })
+                result = self.ingest(file_path)
 
-        return results
+                results.append({
+                    "document_id": result["document_id"],
+                    "source_file": file_path.name,
+                    "file_hash": result["file_hash"],
+                    "chunks": len(result["chunks"]),
+                    "cached": result["cached"],
+                })
+
+            return results
+
+        finally:
+            import shutil
+            shutil.rmtree(
+                extract_dir,
+                ignore_errors=True,
+            )
+
 
     def _persist_to_postgres(
         self,

@@ -4,6 +4,13 @@ from uuid import uuid4
 import streamlit as st
 import traceback
 
+from app.core.upload_validation import (
+    MAX_UPLOAD_SIZE_BYTES,
+    MAX_UPLOAD_SIZE_MB,
+    validate_upload,
+)
+
+
 SUPPORTED_TYPES = [
     "pdf",
     "doc",
@@ -90,7 +97,7 @@ def render_upload_section(
             "Choose files",
             accept_multiple_files=True,
             type=SUPPORTED_TYPES,
-            help="Maximum 200 MB per file",
+            help=f"Maximum {MAX_UPLOAD_SIZE_MB} MB per file",
             key="document_uploader",
         )
 
@@ -114,56 +121,59 @@ def render_upload_section(
                         "Processing your documents..."
                     ):
                         for file in uploaded_files:
-                            extension = Path(
-                                file.name
-                            ).suffix.lower()
+                            
+                            extension = Path(file.name).suffix.lower()
+
+                            if file.size > MAX_UPLOAD_SIZE_BYTES:
+                                st.error(
+                                    f"{file.name}: File exceeds "
+                                    f"{MAX_UPLOAD_SIZE_MB} MB."
+                                )
+                                continue
+
+                            try:
+                                validate_upload(
+                                    filename=file.name,
+                                    size_bytes=file.size,
+                                    header=file.getvalue()[:16],
+                                    allow_zip=True,
+                                )
+                            except ValueError as error:
+                                st.error(f"{file.name}: {error}")
+                                continue
 
                             file_path = (
-                                upload_dir
-                                / f"{uuid4()}{extension}"
+                                upload_dir / f"{uuid4()}{extension}"
                             )
 
-                            file_path.write_bytes(
-                                file.getvalue()
-                            )
+                            try:
+                                file_path.write_bytes(file.getvalue())
 
-                            if file.name.lower().endswith(
-                                ".zip"
-                            ):
-                                zip_results = (
-                                    ingestion_service.ingest_zip(
-                                        file_path
-                                    )
-                                )
-
-                                for result in zip_results:
-                                    results.append(
-                                        {
-                                            "filename": result[
-                                                "source_file"
-                                            ],
-                                            "cached": result[
-                                                "cached"
-                                            ],
-                                        }
+                                if extension == ".zip":
+                                    zip_results = (
+                                        ingestion_service.ingest_zip(
+                                            file_path
+                                        )
                                     )
 
-                            else:
-                                result = (
-                                    ingestion_service.ingest(
+                                    for result in zip_results:
+                                        results.append({
+                                            "filename": result["source_file"],
+                                            "cached": result["cached"],
+                                        })
+                                else:
+                                    result = ingestion_service.ingest(
                                         file_path,
                                         original_filename=file.name,
                                     )
-                                )
 
-                                results.append(
-                                    {
+                                    results.append({
                                         "filename": file.name,
-                                        "cached": result[
-                                            "cached"
-                                        ],
-                                    }
-                                )
+                                        "cached": result["cached"],
+                                    })
+                            finally:
+                                file_path.unlink(missing_ok=True)
+
 
                         retrieval_service.refresh_index()
 
